@@ -190,22 +190,42 @@ stage_user() {
   ok "Stage 2 complete — user $OWP_USER at $OWP_HOME"
 }
 
-# ─── Wait for dpkg lock (handles unattended-upgrades) ──────────────────
+# ─── Wait for dpkg lock (handles hung unattended-upgrades) ─────────────
 wait_for_dpkg() {
   local waited=0
+  local MAX_WAIT=120
   echo "[STATUS] Checking for dpkg lock..."
+
   while fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/cache/apt/archives/lock &>/dev/null 2>&1; do
-    if [[ $waited -ge 300 ]]; then
-      warn "dpkg lock held for 5 minutes. Trying to force..."
-      kill -9 "$(fuser /var/lib/dpkg/lock-frontend 2>/dev/null)" 2>/dev/null || true
-      kill -9 "$(fuser /var/lib/dpkg/lock 2>/dev/null)" 2>/dev/null || true
-      rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/cache/apt/archives/lock 2>/dev/null || true
-      dpkg --configure -a 2>/dev/null || true
-      break
+    local pid
+    local pname
+    pid=$(fuser /var/lib/dpkg/lock-frontend 2>/dev/null | head -1)
+    if [[ -n "$pid" && "$pid" =~ ^[0-9]+$ ]]; then
+      pname=$(ps -p "$pid" -o comm= 2>/dev/null || echo "unknown")
+    else
+      pid="?"
+      pname="unknown"
     fi
-    echo "[WAIT] Another apt process is running (PID: $(fuser /var/lib/dpkg/lock-frontend 2>/dev/null || echo '?')) — waiting... ($((waited/60))m${waited}s)"
-    sleep 5
-    waited=$((waited + 5))
+
+    if [[ $waited -ge $MAX_WAIT ]]; then
+      echo ""
+      warn "dpkg lock held for ${MAX_WAIT}s by ${pname} (PID ${pid}) — force-clearing..."
+      kill -9 "$pid" 2>/dev/null || true
+      sleep 2
+      # Kill any other apt/dpkg processes
+      killall -9 unattended-upgrade apt-get apt dpkg 2>/dev/null || true
+      rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/cache/apt/archives/lock \
+            /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock 2>/dev/null || true
+      dpkg --configure -a 2>/dev/null || true
+      echo "[OK] dpkg lock force-cleared"
+      return 0
+    fi
+
+    if [[ $((waited % 10)) -eq 0 ]]; then
+      echo "[WAIT] ${pname} (PID ${pid}) holds dpkg lock — waiting... (${waited}s)"
+    fi
+    sleep 2
+    waited=$((waited + 2))
   done
   echo "[OK] dpkg is free"
 }
@@ -289,6 +309,7 @@ stage_languages() {
   if [[ "${NODE_EXISTS:-false}" != "true" ]]; then
     info "Installing Node.js ${OWP_NODE_VERSION}.x..."
     curl -fsSL "https://deb.nodesource.com/setup_${OWP_NODE_VERSION}.x" | bash - 2>&1 | tail -3 || die "Failed to setup NodeSource repo"
+    wait_for_dpkg
     apt-get install -y -qq nodejs 2>&1 | tail -3 || die "Failed to install Node.js"
     ok "Node.js $(node -v) installed"
   fi
