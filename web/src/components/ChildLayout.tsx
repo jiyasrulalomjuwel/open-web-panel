@@ -23,7 +23,6 @@ export function ChildLayout() {
   const [darkMode, setDarkMode] = useState(document.documentElement.classList.contains('dark'));
   const navigate = useNavigate();
   const user = getUser();
-  console.log('[ChildLayout] rendering, user:', user?.username, 'token:', !!localStorage.getItem('owp_access_token'));
 
   const toggleDark = () => {
     const next = !darkMode;

@@ -1,14 +1,15 @@
 [Unit]
 Description=OpenWebPanel Child Daemon (%i)
+Documentation=https://github.com/openwebcpanel/openwebcpanel
 After=network.target
 
 [Service]
 Type=simple
-User=claudeuser
-WorkingDirectory=/home/claudeuser/openwebcpanel
-Environment=OWP_HOME_DIR=/home/claudeuser/openwebcpanel/homes/%i
+User=openwebpanel
+WorkingDirectory=/opt/openwebpanel/app
+Environment=OWP_HOME_DIR=/opt/openwebpanel/homes/%i
 Environment=OWP_CHILD_LISTEN=:9001
-ExecStart=/home/claudeuser/openwebcpanel/bin/childd
+ExecStart=/opt/openwebpanel/app/bin/childd
 Restart=always
 RestartSec=5
 

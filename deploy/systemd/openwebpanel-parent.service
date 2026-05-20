@@ -1,20 +1,18 @@
 [Unit]
 Description=OpenWebPanel Parent Daemon
+Documentation=https://github.com/openwebcpanel/openwebcpanel
 After=network.target mariadb.service nginx.service
 Wants=mariadb.service
 
 [Service]
 Type=simple
-User=claudeuser
-WorkingDirectory=/home/claudeuser/openwebcpanel
-Environment=OWP_DB_PATH=./openwebpanel.db
-Environment=OWP_STATIC_DIR=./web/dist
-Environment=OWP_LISTEN=:9000
-Environment=OWP_SMTP_PORT=2525
-Environment=OWP_JWT_SECRET=change-this-to-a-random-secret
-ExecStart=/home/claudeuser/openwebcpanel/bin/parentd
+User=openwebpanel
+WorkingDirectory=/opt/openwebpanel/app
+EnvironmentFile=/opt/openwebpanel/app/.env
+ExecStart=/opt/openwebpanel/app/bin/parentd
 Restart=always
 RestartSec=5
+LimitNOFILE=65536
 
 [Install]
 WantedBy=multi-user.target
