@@ -190,9 +190,31 @@ stage_user() {
   ok "Stage 2 complete — user $OWP_USER at $OWP_HOME"
 }
 
+# ─── Wait for dpkg lock (handles unattended-upgrades) ──────────────────
+wait_for_dpkg() {
+  local waited=0
+  echo "[STATUS] Checking for dpkg lock..."
+  while fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/cache/apt/archives/lock &>/dev/null 2>&1; do
+    if [[ $waited -ge 300 ]]; then
+      warn "dpkg lock held for 5 minutes. Trying to force..."
+      kill -9 "$(fuser /var/lib/dpkg/lock-frontend 2>/dev/null)" 2>/dev/null || true
+      kill -9 "$(fuser /var/lib/dpkg/lock 2>/dev/null)" 2>/dev/null || true
+      rm -f /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/cache/apt/archives/lock 2>/dev/null || true
+      dpkg --configure -a 2>/dev/null || true
+      break
+    fi
+    echo "[WAIT] Another apt process is running (PID: $(fuser /var/lib/dpkg/lock-frontend 2>/dev/null || echo '?')) — waiting... ($((waited/60))m${waited}s)"
+    sleep 5
+    waited=$((waited + 5))
+  done
+  echo "[OK] dpkg is free"
+}
+
 # ─── Stage 3: System Packages ────────────────────────────────────────────
 stage_system_packages() {
   header "Stage 3/10 — System Packages"
+
+  wait_for_dpkg
 
   echo "[STATUS] Updating package lists..."
   apt-get update -qq 2>&1 | tail -3 || warn "apt-get update had issues, continuing..."
