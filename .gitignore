@@ -1,0 +1,50 @@
+# Binaries
+bin/
+parentd
+childd
+*.exe
+*.test
+*.out
+*.o
+
+# Environment & config
+.env
+.env.local
+*.db
+*.db-shm
+*.db-wal
+
+# Node
+node_modules/
+web/dist/
+web/.vite/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# Go workspace
+go.work
+go.work.sum
+
+# Temp
+tmp/
+/tmp/
+
+# Backups
+backups/
+
+# User homes (runtime data — created by the panel when accounts are made)
+homes/
+!homes/.gitkeep

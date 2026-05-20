@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  mariadb:
+    image: mariadb:11
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-owp_root_password}
+      MYSQL_USER: owp_admin
+      MYSQL_PASSWORD: ${MYSQL_ADMIN_PASSWORD:-owp_admin_password}
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    restart: always
+    environment:
+      PMA_HOST: mariadb
+      PMA_USER: owp_admin
+      PMA_PASSWORD: ${MYSQL_ADMIN_PASSWORD:-owp_admin_password}
+      UPLOAD_LIMIT: 256M
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+  openwebpanel:
+    build: .
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "2082:2082"
+      - "2086:2086"
+      - "9000:9000"
+    environment:
+      OWP_JWT_SECRET: ${OWP_JWT_SECRET:-change-this-in-production}
+      OWP_DB_PATH: /app/openwebpanel.db
+      OWP_STATIC_DIR: /app/web/dist
+      OWP_LISTEN: :9000
+      OWP_SHARED_IP: ${OWP_SHARED_IP:-127.0.0.1}
+      OWP_PUBLIC_HOST: ${OWP_PUBLIC_HOST:-127.0.0.1:9000}
+      OWP_PHPMYADMIN_PORT: http://phpmyadmin:80
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-owp_root_password}
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    volumes:
+      - homes_data:/app/homes
+      - nginx_logs:/var/log/nginx
+
+volumes:
+  mariadb_data:
+  homes_data:
+  nginx_logs:
