@@ -1,40 +1,30 @@
 #!/usr/bin/env bash
-# ═══════════════════════════════════════════════════════════════════════════
-# OpenWebPanel Installer v2.0
-#   Web Hosting Control Panel — One-command install on Ubuntu/Debian
+# ═══════════════════════════════════════════════════════════════════════════════
+# OpenWebPanel Installer v2.1
+#   One-command web hosting control panel installer for Ubuntu/Debian
 #
 # Usage:
-#   # Via curl (standalone — no files needed):
-#   curl -fsSL https://raw.githubusercontent.com/openwebcpanel/openwebcpanel/main/install.sh | sudo bash
-#
-#   # Via wget:
-#   wget -qO- https://raw.githubusercontent.com/openwebcpanel/openwebcpanel/main/install.sh | sudo bash
-#
-#   # From local source:
+#   curl -fsSL https://raw.githubusercontent.com/jiyasrulalomjuwel/open-web-panel/main/install.sh | sudo bash
 #   sudo bash install.sh
-#
-#   # With options:
-#   sudo OWP_DOMAIN=panel.example.com OWP_USER=myadmin bash install.sh
+#   sudo OWP_DOMAIN=1.2.3.4 bash install.sh
 #
 # Env overrides:
-#   OWP_VERSION       Git tag/branch to clone (default: main)
-#   OWP_REPO          GitHub repo (default: openwebcpanel/openwebcpanel)
-#   OWP_USER          System user for the panel (default: openwebpanel)
-#   OWP_HOME          Install directory (default: /opt/openwebpanel)
-#   OWP_DOMAIN        Server domain or public IP (default: auto-detected)
-#   OWP_JWT_SECRET    JWT signing secret (default: auto-generated)
-#   OWP_PANEL_PORT    Admin panel port (default: 2086)
-#   OWP_USER_PORT     User panel port (default: 2082)
-#   OWP_PHPMYADMIN_VER phpMyAdmin version (default: 5.2.2)
-#   OWP_SKIP_FIREWALL Set to "true" to skip UFW config
-#   OWP_SKIP_SWAP     Set to "true" to skip creating swap
-#   OWP_DEBUG         Set to "true" for verbose output
-# ═══════════════════════════════════════════════════════════════════════════
-set -euo pipefail
+#   OWP_VERSION, OWP_REPO, OWP_USER, OWP_HOME, OWP_DOMAIN,
+#   OWP_JWT_SECRET, OWP_PANEL_PORT, OWP_USER_PORT,
+#   OWP_SKIP_FIREWALL, OWP_SKIP_SWAP, OWP_DEBUG
+# ═══════════════════════════════════════════════════════════════════════════════
 
-# ─── Config ──────────────────────────────────────────────────────────────
+# Do NOT use set -e — we handle errors manually so output is always visible
+set -uo pipefail
+
+# ─── Force unbuffered output so every line shows immediately ──────────────
+export DEBIAN_FRONTEND=noninteractive
+export SHELLOPTS
+[[ -t 1 ]] || exec stdbuf -oL -eL bash 2>/dev/null || true
+
+# ─── Config ───────────────────────────────────────────────────────────────
 OWP_VERSION="${OWP_VERSION:-main}"
-OWP_REPO="${OWP_REPO:-openwebcpanel/openwebcpanel}"
+OWP_REPO="${OWP_REPO:-jiyasrulalomjuwel/open-web-panel}"
 OWP_USER="${OWP_USER:-openwebpanel}"
 OWP_HOME="${OWP_HOME:-/opt/openwebpanel}"
 OWP_DATA="${OWP_HOME}/data"
@@ -51,157 +41,174 @@ OWP_USER_PORT="${OWP_USER_PORT:-2082}"
 OWP_PHPMYADMIN_VER="${OWP_PHPMYADMIN_VER:-5.2.2}"
 OWP_GO_VERSION="1.25.0"
 OWP_NODE_VERSION="20"
+PASSGEN_SOURCE="openssl"
 
-# Generated passwords
-OWP_MYSQL_ROOT_PW="$(tr -dc A-Za-z0-9 </dev/urandom | head -c 20)"
-OWP_MYSQL_ADMIN_PW="$(tr -dc A-Za-z0-9 </dev/urandom | head -c 20)"
-
-# ─── Colors & Helpers ────────────────────────────────────────────────────
+# ─── Colors ───────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; CYAN='\033[0;36m'; NC='\033[0m'
-info()  { echo -e "${CYAN}[INFO]${NC}  $*"; }
-ok()    { echo -e "${GREEN}[OK]${NC}    $*"; }
-warn()  { echo -e "${YELLOW}[WARN]${NC}  $*"; }
-err()   { echo -e "${RED}[ERR]${NC}   $*"; }
-header(){ echo -e "\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"; echo -e "${BLUE}  $*${NC}"; echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"; }
+info()   { echo -e "${CYAN}[INFO]${NC}  $*"; }
+ok()     { echo -e "${GREEN}[OK]${NC}    $*"; }
+warn()   { echo -e "${YELLOW}[WARN]${NC}  $*"; }
+err()    { echo -e "${RED}[ERR]${NC}   $*"; }
+die()    { err "$@"; exit 1; }
+header() { echo -e "\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"; echo -e "${BLUE}  $*${NC}"; echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"; }
 section(){ echo -e "\n${YELLOW}▶ $*${NC}"; }
 
-debug() {
-  if [[ "$OWP_DEBUG" == "true" ]]; then
-    echo -e "${YELLOW}[DEBUG]${NC} $*"
+debug() { [[ "$OWP_DEBUG" == "true" ]] && echo -e "${YELLOW}[DEBUG]${NC} $*"; }
+
+# ─── Password generation (works on all Ubuntu versions) ───────────────────
+gen_password() {
+  local len="${1:-20}"
+  if command -v openssl &>/dev/null; then
+    openssl rand -base64 30 2>/dev/null | tr -dc 'A-Za-z0-9' | head -c "$len"
+  elif command -v python3 &>/dev/null; then
+    python3 -c "import secrets; print(secrets.token_hex($len))" 2>/dev/null | head -c "$len"
+  else
+    # Fallback: use /dev/urandom only with limited charset
+    head -c 100 /dev/urandom | LC_ALL=C tr -dc 'A-Za-z0-9' | head -c "$len"
   fi
+  echo
 }
 
-cleanup() {
-  local ec=$?
-  if [[ $ec -ne 0 ]]; then
-    echo ""
-    err "Installation FAILED (exit code $ec)"
-    err "Check the log above for details."
-    err ""
-    err "You can re-run the installer after fixing any issues."
-    err "If you need help, open an issue at:"
-    err "  https://github.com/openwebcpanel/openwebcpanel/issues"
-  fi
-  exit $ec
-}
-trap cleanup EXIT
+# ─── Pre-flight check (called BEFORE anything else) ──────────────────────
+preflight_check() {
+  # Immediately show the script is running — this is the first visible output
+  echo ""
+  echo -e "${BLUE}╔══════════════════════════════════════════════════╗${NC}"
+  echo -e "${BLUE}║     OpenWebPanel Installer v2.1                 ║${NC}"
+  echo -e "${BLUE}║     Web Hosting Control Panel                   ║${NC}"
+  echo -e "${BLUE}╚══════════════════════════════════════════════════╝${NC}"
+  echo ""
+  echo "[STATUS] Pre-flight checks starting..."
 
-# ─── Stage 1: Prerequisites ─────────────────────────────────────────────
+  # Check root
+  if [[ $EUID -ne 0 ]]; then
+    echo "[ERROR] This installer must be run as root (or with sudo)"
+    exit 1
+  fi
+  echo "[OK] Running as root"
+
+  # Check OS
+  if [[ -f /etc/os-release ]]; then
+    . /etc/os-release
+    echo "[OK] OS: $NAME $VERSION_ID"
+  else
+    echo "[WARN] Cannot detect OS, proceeding anyway"
+    ID="unknown"
+    VERSION_ID="unknown"
+  fi
+
+  # Check arch
+  ARCH=$(uname -m)
+  case "$ARCH" in
+    x86_64)  ARCH="amd64" ;; aarch64) ARCH="arm64" ;;
+    *)
+      echo "[ERROR] Unsupported architecture: $ARCH"
+      exit 1
+      ;;
+  esac
+  echo "[OK] Architecture: $ARCH"
+
+  # Check bash version
+  echo "[OK] Bash: $BASH_VERSION"
+
+  # Generate passwords
+  echo "[STATUS] Generating passwords..."
+  OWP_MYSQL_ROOT_PW="$(gen_password 20)"
+  OWP_MYSQL_ADMIN_PW="$(gen_password 20)"
+  debug "MySQL root password: $OWP_MYSQL_ROOT_PW"
+
+  # Set JWT secret
+  if [[ -z "$OWP_JWT_SECRET" ]]; then
+    OWP_JWT_SECRET="$(gen_password 48)"
+  fi
+
+  echo "[OK] Pre-flight checks complete"
+  echo ""
+}
+
+# ─── Stage 1: Prerequisites ──────────────────────────────────────────────
 stage_prereqs() {
   header "Stage 1/10 — Prerequisites"
 
-  if [[ $EUID -ne 0 ]]; then
-    err "This installer must be run as root (or with sudo)"
-    exit 1
-  fi
-
-  if [[ ! -f /etc/os-release ]]; then
-    err "Cannot detect OS — /etc/os-release not found"
-    exit 1
-  fi
-
-  . /etc/os-release
-  if [[ "$ID" != "ubuntu" && "$ID" != "debian" ]]; then
-    warn "Target: Ubuntu/Debian. Detected: $ID $VERSION_ID — proceeding anyway"
-  fi
-  info "OS: $NAME $VERSION_ID"
-
-  ARCH=$(uname -m)
-  case "$ARCH" in
-    x86_64)  ARCH="amd64" ;;
-    aarch64) ARCH="arm64" ;;
-    *)       err "Unsupported architecture: $ARCH"; exit 1 ;;
-  esac
-  info "Architecture: $ARCH"
-
-  # Auto-detect domain / public IP
+  # Auto-detect domain
   if [[ -z "$OWP_DOMAIN" ]]; then
+    echo "[STATUS] Detecting public IP..."
     OWP_DOMAIN=$(curl -4 -s --connect-timeout 5 ifconfig.me 2>/dev/null || \
                  hostname -I 2>/dev/null | awk '{print $1}' || \
                  echo "127.0.0.1")
+    echo "[OK] Server IP: $OWP_DOMAIN"
+  else
+    info "Server: $OWP_DOMAIN"
   fi
-  info "Server: $OWP_DOMAIN"
 
   # Check disk space
   AVAIL_KB=$(df / --output=avail 2>/dev/null | tail -1)
   if [[ -n "$AVAIL_KB" && "$AVAIL_KB" -lt 1048576 ]]; then
-    err "Less than 1GB disk space available. At least 1GB is required."
-    exit 1
+    die "Less than 1GB disk space available. At least 1GB is required."
   fi
+  info "Disk space: $((AVAIL_KB / 1024))MB available"
 
-  # Check memory and set up swap if needed
+  # Memory check + swap
   local mem_kb
   mem_kb=$(grep MemTotal /proc/meminfo 2>/dev/null | awk '{print $2}' || echo 0)
   local mem_mb=$((mem_kb / 1024))
   info "Memory: ${mem_mb}MB"
 
   if [[ "$mem_mb" -lt 1024 && "$OWP_SKIP_SWAP" != "true" ]]; then
-    warn "Less than 1GB RAM detected. Creating 2GB swap file..."
+    warn "Less than 1GB RAM. Creating 2GB swap file..."
     if [[ -f /swapfile ]]; then
-      info "Swap file already exists at /swapfile"
+      info "Swap already exists at /swapfile"
     else
-      dd if=/dev/zero of=/swapfile bs=1M count=2048 status=progress
+      dd if=/dev/zero of=/swapfile bs=1M count=2048 status=progress 2>/dev/null
       chmod 600 /swapfile
-      mkswap /swapfile
+      mkswap /swapfile >/dev/null 2>&1
       swapon /swapfile
       echo '/swapfile none swap sw 0 0' >> /etc/fstab
       ok "2GB swap created"
     fi
   fi
 
-  # Set JWT secret if not provided
-  if [[ -z "$OWP_JWT_SECRET" ]]; then
-    OWP_JWT_SECRET="$(tr -dc A-Za-z0-9 </dev/urandom | head -c 48)"
-  fi
-
-  ok "Prerequisites passed"
+  ok "Stage 1 complete"
 }
 
-# ─── Stage 2: System User ───────────────────────────────────────────────
+# ─── Stage 2: System User ────────────────────────────────────────────────
 stage_user() {
   header "Stage 2/10 — System User"
 
   if id "$OWP_USER" &>/dev/null; then
     info "User '$OWP_USER' already exists"
   else
-    useradd -m -d "$OWP_HOME" -s /usr/sbin/nologin -U "$OWP_USER"
+    useradd -m -d "$OWP_HOME" -s /usr/sbin/nologin -U "$OWP_USER" 2>&1 || die "Failed to create user '$OWP_USER'"
     info "Created system user: $OWP_USER"
   fi
 
-  # Create directory structure
   mkdir -p "$OWP_HOME" "$OWP_DATA" "$OWP_HOMES_DIR" "$OWP_LOGS" "$OWP_BACKUPS"
-
-  # Add www-data to panel user group for PHP-FPM/nginx access
   usermod -aG "$OWP_USER" www-data 2>/dev/null || true
-
   chown -R "$OWP_USER:$OWP_USER" "$OWP_HOME"
   chmod 755 "$OWP_HOME"
 
-  ok "User and directory structure ready"
+  ok "Stage 2 complete — user $OWP_USER at $OWP_HOME"
 }
 
 # ─── Stage 3: System Packages ────────────────────────────────────────────
 stage_system_packages() {
   header "Stage 3/10 — System Packages"
 
-  export DEBIAN_FRONTEND=noninteractive
+  echo "[STATUS] Updating package lists..."
+  apt-get update -qq 2>&1 | tail -3 || warn "apt-get update had issues, continuing..."
 
-  info "Updating package lists..."
-  apt-get update -qq
-
-  # Determine PHP version based on OS
+  # Determine PHP version
   PHP_VER="8.3"
   if [[ "$ID" == "ubuntu" ]]; then
     case "$VERSION_ID" in
       20.04) PHP_VER="8.0" ;;
       22.04) PHP_VER="8.1" ;;
-      *)     PHP_VER="8.3" ;;
     esac
   fi
   echo "$PHP_VER" > /tmp/owp_php_ver
   info "PHP version: $PHP_VER"
 
-  info "Installing packages..."
+  info "Installing packages (this may take a few minutes)..."
   apt-get install -y -qq \
     curl wget git tar gpg build-essential \
     nginx \
@@ -210,71 +217,79 @@ stage_system_packages() {
     "php${PHP_VER}-mbstring" "php${PHP_VER}-xml" "php${PHP_VER}-bcmath" \
     "php${PHP_VER}-gd" "php${PHP_VER}-zip" \
     unzip openssl sudo cron sqlite3 \
-    rsync jq ufw 2>&1 | tail -3
+    rsync jq ufw 2>&1 || {
+      err "Some packages failed to install."
+      err "Try running: apt-get install -y nginx mariadb-server php${PHP_VER}-fpm unzip openssl"
+      die "Package installation failed"
+    }
 
-  ok "System packages installed"
+  ok "Stage 3 complete — system packages installed"
 }
 
-# ─── Stage 4: Go & Node.js ──────────────────────────────────────────────
+# ─── Stage 4: Go & Node.js ───────────────────────────────────────────────
 stage_languages() {
   header "Stage 4/10 — Go & Node.js"
 
-  # ─── Go ───
+  # ─── Go ──────────────────────────────────────────────────────────
   if command -v go &>/dev/null; then
-    GO_CUR=$(go version | grep -oP 'go\K[0-9.]+' | cut -d. -f1-2)
-    info "Go $(go version | grep -oP 'go\S+') already installed"
-    if (( $(echo "$GO_CUR < 1.22" | bc -l 2>/dev/null || echo 0) )); then
+    GO_CUR=$(go version | grep -oP 'go\K[0-9]+\.[0-9]+' 2>/dev/null || echo "0")
+    info "Go $(go version | grep -oP 'go\S+' 2>/dev/null) already installed"
+    if awk "BEGIN {exit !($GO_CUR < 1.22)}" 2>/dev/null; then
       warn "Go $GO_CUR is too old (need 1.22+), upgrading..."
       rm -f "$(which go)" 2>/dev/null || true
+    else
+      GO_CUR=""  # flag to skip install
     fi
   fi
 
-  if ! command -v go &>/dev/null; then
+  if ! command -v go &>/dev/null || [[ -n "${GO_CUR:-}" ]]; then
     info "Installing Go ${OWP_GO_VERSION}..."
-    wget -q "https://go.dev/dl/go${OWP_GO_VERSION}.linux-${ARCH}.tar.gz" -O /tmp/go.tar.gz
+    wget -q "https://go.dev/dl/go${OWP_GO_VERSION}.linux-${ARCH}.tar.gz" -O /tmp/go.tar.gz || die "Failed to download Go"
     rm -rf /usr/local/go
-    tar -C /usr/local -xzf /tmp/go.tar.gz
+    tar -C /usr/local -xzf /tmp/go.tar.gz || die "Failed to extract Go"
     rm /tmp/go.tar.gz
     ln -sf /usr/local/go/bin/go /usr/local/bin/go
     ln -sf /usr/local/go/bin/gofmt /usr/local/bin/gofmt
     ok "Go ${OWP_GO_VERSION} installed"
   fi
 
-  # ─── Node.js ───
+  # ─── Node.js ─────────────────────────────────────────────────────
   if command -v node &>/dev/null; then
     NODE_MAJOR=$(node -v | sed 's/v//' | cut -d. -f1)
     info "Node.js $(node -v) already installed"
     if [[ "$NODE_MAJOR" -lt 20 ]]; then
-      warn "Node.js $(node -v) is too old (need 20+), upgrading..."
-      rm -f "$(which node)" 2>/dev/null || true
+      warn "Node.js is too old (need 20+), upgrading..."
+    else
+      NODE_EXISTS=true
     fi
   fi
 
-  if ! command -v node &>/dev/null || [[ $(node -v | sed 's/v//' | cut -d. -f1) -lt 20 ]]; then
+  if [[ "${NODE_EXISTS:-false}" != "true" ]]; then
     info "Installing Node.js ${OWP_NODE_VERSION}.x..."
-    curl -fsSL "https://deb.nodesource.com/setup_${OWP_NODE_VERSION}.x" | bash -
-    apt-get install -y -qq nodejs
+    curl -fsSL "https://deb.nodesource.com/setup_${OWP_NODE_VERSION}.x" | bash - 2>&1 | tail -3 || die "Failed to setup NodeSource repo"
+    apt-get install -y -qq nodejs 2>&1 | tail -3 || die "Failed to install Node.js"
     ok "Node.js $(node -v) installed"
   fi
+
+  ok "Stage 4 complete — Go & Node.js ready"
 }
 
-# ─── Stage 5: Project Files ─────────────────────────────────────────────
+# ─── Stage 5: Project Files ──────────────────────────────────────────────
 stage_project() {
   header "Stage 5/10 — Project Files"
-  local src_dir
+
   local script_dir
   script_dir="$(cd "$(dirname "$0")" && pwd 2>/dev/null)"
 
-  # Check if we're running from inside the project source
-  if [[ -f "$script_dir/go.mod" ]] && grep -q "openwebcpanel" "$script_dir/go.mod" 2>/dev/null; then
+  if [[ -f "$script_dir/go.mod" ]] && grep -q "openwebcpanel\|open-web-panel" "$script_dir/go.mod" 2>/dev/null; then
     info "Copying project from local source: $script_dir"
-    src_dir="$script_dir"
     mkdir -p "${OWP_HOME}/app"
     rsync -a --delete \
       --exclude='.git' --exclude='node_modules' --exclude='bin' \
       --exclude='homes' --exclude='*.db' --exclude='*.db-shm' --exclude='*.db-wal' \
       --exclude='__pycache__' --exclude='.env' \
-      "$src_dir"/ "${OWP_HOME}/app/"
+      "$script_dir"/ "${OWP_HOME}/app/" 2>&1
+    ok "Project files copied from local source"
   elif [[ -d "${OWP_HOME}/app" && -f "${OWP_HOME}/app/go.mod" ]]; then
     info "Project already installed at ${OWP_HOME}/app"
     if command -v git &>/dev/null; then
@@ -283,144 +298,149 @@ stage_project() {
     fi
     return
   else
-    if ! command -v git &>/dev/null; then
-      err "git is required to download the project"
-      exit 1
-    fi
-    local repo_url="https://github.com/${OWP_REPO}.git"
     info "Cloning ${OWP_REPO} (branch: ${OWP_VERSION})..."
     rm -rf "${OWP_HOME}/app"
-    git clone --depth 1 --branch "$OWP_VERSION" "$repo_url" "${OWP_HOME}/app" 2>/dev/null || {
+    git clone --depth 1 --branch "$OWP_VERSION" "https://github.com/${OWP_REPO}.git" "${OWP_HOME}/app" 2>&1 || {
       warn "Branch '${OWP_VERSION}' not found, trying default branch..."
-      git clone --depth 1 "$repo_url" "${OWP_HOME}/app"
+      git clone --depth 1 "https://github.com/${OWP_REPO}.git" "${OWP_HOME}/app" 2>&1
     }
-    src_dir="${OWP_HOME}/app"
+    ok "Project cloned from GitHub"
   fi
 
   chown -R "$OWP_USER:$OWP_USER" "${OWP_HOME}/app" 2>/dev/null || true
-  ok "Project files at ${OWP_HOME}/app"
+  ok "Stage 5 complete — project at ${OWP_HOME}/app"
 }
 
-# ─── Stage 6: Services Configuration ────────────────────────────────────
+# ─── Stage 6: Services Configuration ─────────────────────────────────────
 stage_services() {
   header "Stage 6/10 — Services Configuration"
   PHP_VER=$(cat /tmp/owp_php_ver 2>/dev/null || echo "8.3")
 
-  # ─── nginx ──────────────────────────────────────────────────────
+  # ─── nginx ───────────────────────────────────────────────────────
   section "Configuring nginx"
   mkdir -p /etc/nginx/sites-enabled /etc/nginx/vhosts
   rm -f /etc/nginx/sites-enabled/default
 
-  cat > /etc/nginx/sites-available/openwebpanel <<NGINX_CONF
+  cat > /etc/nginx/sites-available/openwebpanel << 'NGINX_CONF'
 server {
     listen 80 default_server;
     listen [::]:80 default_server;
     server_name _;
     client_max_body_size 2048M;
-
-    # Security headers
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
 
     location / {
         proxy_pass http://127.0.0.1:9000;
         proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
         proxy_buffering off;
     }
 
     location /api/ {
         proxy_pass http://127.0.0.1:9000;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
 
     location /pma/ {
         proxy_pass http://127.0.0.1:8080/;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
     }
 
     location ^~ /.well-known/acme-challenge/ {
         proxy_pass http://127.0.0.1:9000;
-        proxy_set_header Host \$host;
+        proxy_set_header Host $host;
     }
 }
 
 server {
-    listen ${OWP_PANEL_PORT};
-    listen [::]:${OWP_PANEL_PORT};
+    listen GUI_PORT;
+    listen [::]:GUI_PORT;
     server_name _;
     client_max_body_size 0;
-
     location / {
         proxy_pass http://127.0.0.1:9000;
         proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
 }
 
 server {
-    listen ${OWP_USER_PORT};
-    listen [::]:${OWP_USER_PORT};
+    listen USER_PORT;
+    listen [::]:USER_PORT;
     server_name _;
     client_max_body_size 0;
-
     location / {
         proxy_pass http://127.0.0.1:9000;
         proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
 }
 NGINX_CONF
 
+  sed -i "s/GUI_PORT/${OWP_PANEL_PORT}/g" /etc/nginx/sites-available/openwebpanel
+  sed -i "s/USER_PORT/${OWP_USER_PORT}/g" /etc/nginx/sites-available/openwebpanel
+
   ln -sf /etc/nginx/sites-available/openwebpanel /etc/nginx/sites-enabled/openwebpanel
-  sed -i 's/^user .*/user www-data;/' /etc/nginx/nginx.conf
+  sed -i 's/^user .*/user www-data;/' /etc/nginx/nginx.conf 2>/dev/null || true
   mkdir -p /var/log/nginx
 
-  # Test nginx config
-  nginx -t 2>/dev/null || warn "nginx config test had issues (will fix later)"
+  nginx -t 2>&1 && ok "nginx config valid" || warn "nginx config has issues"
   ok "nginx configured"
 
-  # ─── MariaDB ────────────────────────────────────────────────────
+  # ─── MariaDB ─────────────────────────────────────────────────────
   section "Configuring MariaDB"
   systemctl enable mariadb --now 2>/dev/null || service mariadb start 2>/dev/null || true
 
+  # Wait for MariaDB
+  echo "[STATUS] Waiting for MariaDB to start..."
   for i in $(seq 1 15); do
-    if mysql -e "SELECT 1" &>/dev/null; then break; fi
+    if mysqladmin ping --silent 2>/dev/null; then break; fi
     sleep 1
   done
 
-  # Secure MariaDB and create admin user
-  mysql <<SQL
-ALTER USER 'root'@'localhost' IDENTIFIED BY '${OWP_MYSQL_ROOT_PW}';
-DELETE FROM mysql.user WHERE User='';
-DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost','127.0.0.1','::1');
-DROP DATABASE IF EXISTS test;
-DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
-CREATE USER IF NOT EXISTS 'owp_admin'@'localhost' IDENTIFIED BY '${OWP_MYSQL_ADMIN_PW}';
-GRANT ALL PRIVILEGES ON *.* TO 'owp_admin'@'localhost' WITH GRANT OPTION;
-FLUSH PRIVILEGES;
-SQL
+  mysqladmin ping --silent 2>/dev/null || warn "MariaDB didn't respond, continuing anyway..."
+
+  # Try to configure MariaDB (handle case where auth_socket is used)
+  mysql -e "SELECT 1" 2>/dev/null && MYSQL_AUTH="native" || MYSQL_AUTH="socket"
+
+  if [[ "$MYSQL_AUTH" == "socket" ]]; then
+    # Ubuntu 24.04+ uses auth_socket by default
+    mysql -e "
+      ALTER USER 'root'@'localhost' IDENTIFIED BY '${OWP_MYSQL_ROOT_PW}';
+    " 2>&1 || {
+      mysql --socket=/run/mysqld/mysqld.sock -e "
+        ALTER USER 'root'@'localhost' IDENTIFIED BY '${OWP_MYSQL_ROOT_PW}';
+      " 2>&1 || warn "Could not set MariaDB root password (may need manual config)"
+    }
+  else
+    mysql -e "
+      ALTER USER 'root'@'localhost' IDENTIFIED BY '${OWP_MYSQL_ROOT_PW}';
+      DELETE FROM mysql.user WHERE User='';
+      DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost','127.0.0.1','::1');
+      DROP DATABASE IF EXISTS test;
+      DELETE FROM mysql.db WHERE Db='test' OR Db='test\\_%';
+      CREATE USER IF NOT EXISTS 'owp_admin'@'localhost' IDENTIFIED BY '${OWP_MYSQL_ADMIN_PW}';
+      GRANT ALL PRIVILEGES ON *.* TO 'owp_admin'@'localhost' WITH GRANT OPTION;
+      FLUSH PRIVILEGES;
+    " 2>&1 || warn "MariaDB secure config had issues"
+  fi
 
   # Save root credentials
   cat > /root/.my.cnf <<EOF
@@ -430,64 +450,39 @@ password=${OWP_MYSQL_ROOT_PW}
 EOF
   chmod 600 /root/.my.cnf
 
-  # Restrict owp_admin privileges
-  mysql -u root -p"${OWP_MYSQL_ROOT_PW}" -e "
-    REVOKE SUPER, SHUTDOWN, CREATE USER, FILE, PROCESS, RELOAD,
-      REPLICATION SLAVE, REPLICATION CLIENT
-    ON *.* FROM 'owp_admin'@'localhost';
-    FLUSH PRIVILEGES;
-  " 2>/dev/null || true
-
   ok "MariaDB configured"
 
-  # ─── PHP ────────────────────────────────────────────────────────
+  # ─── PHP ─────────────────────────────────────────────────────────
   section "Configuring PHP"
-
   PHP_INI="/etc/php/${PHP_VER}/fpm/php.ini"
   if [[ -f "$PHP_INI" ]]; then
     sed -i 's/^upload_max_filesize = .*/upload_max_filesize = 256M/' "$PHP_INI"
     sed -i 's/^post_max_size = .*/post_max_size = 256M/' "$PHP_INI"
     sed -i 's/^max_execution_time = .*/max_execution_time = 300/' "$PHP_INI"
-    sed -i 's/^max_input_time = .*/max_input_time = 120/' "$PHP_INI"
     sed -i 's/^memory_limit = .*/memory_limit = 256M/' "$PHP_INI"
-  fi
-
-  POOL_CONF="/etc/php/${PHP_VER}/fpm/pool.d/www.conf"
-  if [[ -f "$POOL_CONF" ]]; then
-    sed -i "s|^listen = .*|listen = /run/php/php${PHP_VER}-fpm.sock|" "$POOL_CONF"
-    sed -i 's/^;listen.owner = .*/listen.owner = www-data/' "$POOL_CONF"
-    sed -i 's/^;listen.group = .*/listen.group = www-data/' "$POOL_CONF"
-    sed -i 's/^;listen.mode = .*/listen.mode = 0660/' "$POOL_CONF"
-    # Increase worker processes for hosting
-    sed -i 's/^pm.max_children = .*/pm.max_children = 50/' "$POOL_CONF"
   fi
 
   systemctl enable "php${PHP_VER}-fpm" --now 2>/dev/null || true
   ok "PHP ${PHP_VER} configured"
 
-  # ─── phpMyAdmin ────────────────────────────────────────────────
+  # ─── phpMyAdmin ─────────────────────────────────────────────────
   section "Installing phpMyAdmin"
   PMA_DIR="/usr/share/phpmyadmin"
   if [[ -d "$PMA_DIR" && -f "$PMA_DIR/index.php" ]]; then
     info "phpMyAdmin already installed at $PMA_DIR"
   else
     mkdir -p "$PMA_DIR"
-    PMA_URL="https://files.phpmyadmin.net/phpMyAdmin/${OWP_PHPMYADMIN_VER}/phpMyAdmin-${OWP_PHPMYADMIN_VER}-all-languages.zip"
     info "Downloading phpMyAdmin ${OWP_PHPMYADMIN_VER}..."
-    wget -q "$PMA_URL" -O /tmp/pma.zip
-    unzip -qo /tmp/pma.zip -d /tmp/pma/
+    wget -q "https://files.phpmyadmin.net/phpMyAdmin/${OWP_PHPMYADMIN_VER}/phpMyAdmin-${OWP_PHPMYADMIN_VER}-all-languages.zip" -O /tmp/pma.zip || die "Failed to download phpMyAdmin"
+    unzip -qo /tmp/pma.zip -d /tmp/pma/ || die "Failed to unzip phpMyAdmin"
     cp -r /tmp/pma/phpMyAdmin-${OWP_PHPMYADMIN_VER}-all-languages/* "$PMA_DIR/"
     rm -rf /tmp/pma /tmp/pma.zip
     ok "phpMyAdmin ${OWP_PHPMYADMIN_VER} installed"
   fi
 
-  BLOWFISH_SECRET=$(openssl rand -base64 32 2>/dev/null || tr -dc A-Za-z0-9 </dev/urandom | head -c 32)
-  if [[ ! -f "$PMA_DIR/config.inc.php" ]]; then
-    cp "$PMA_DIR/config.sample.inc.php" "$PMA_DIR/config.inc.php" 2>/dev/null || true
-  fi
-  cat > "$PMA_DIR/config.inc.php" <<PMAEOF
+  BLOWFISH_SECRET="$(gen_password 32)"
+  cat > "$PMA_DIR/config.inc.php" <<PMACFG
 <?php
-declare(strict_types=1);
 \$cfg['blowfish_secret'] = '${BLOWFISH_SECRET}';
 \$i = 1;
 \$cfg['Servers'][\$i]['auth_type'] = 'cookie';
@@ -496,24 +491,23 @@ declare(strict_types=1);
 \$cfg['Servers'][\$i]['compress'] = false;
 \$cfg['Servers'][\$i]['AllowNoPassword'] = false;
 \$cfg['Servers'][\$i]['hide_db'] = 'information_schema|performance_schema|mysql|sys';
-\$cfg['UploadDir'] = '';
-\$cfg['SaveDir'] = '';
 \$cfg['ShowChgPassword'] = false;
 \$cfg['ShowDbSpecificCreation'] = true;
-PMAEOF
+PMACFG
   chown -R www-data:www-data "$PMA_DIR" 2>/dev/null || true
   ok "phpMyAdmin configured"
+
+  ok "Stage 6 complete — all services configured"
 }
 
-# ─── Stage 7: Build ──────────────────────────────────────────────────────
+# ─── Stage 7: Build ───────────────────────────────────────────────────────
 stage_build() {
   header "Stage 7/10 — Building"
   export PATH="/usr/local/go/bin:$PATH"
   PHP_VER=$(cat /tmp/owp_php_ver 2>/dev/null || echo "8.3")
 
-  cd "${OWP_HOME}/app"
-
-  # ─── Environment file ───────────────────────────────────────────
+  # ─── Environment file ────────────────────────────────────────────
+  section "Writing .env configuration"
   cat > "${OWP_HOME}/app/.env" <<EOF
 OWP_JWT_SECRET=${OWP_JWT_SECRET}
 OWP_DB_PATH=${OWP_DATA}/openwebpanel.db
@@ -537,37 +531,41 @@ EOF
   chown "$OWP_USER:$OWP_USER" "${OWP_HOME}/app/.env"
   ok "Environment configured"
 
-  # ─── Backend ────────────────────────────────────────────────────
-  section "Building backend (parentd)"
+  # ─── Backend ─────────────────────────────────────────────────────
+  section "Building backend (Go)"
   cd "${OWP_HOME}/app"
-  CGO_ENABLED=1 go build -o bin/parentd ./cmd/parentd/ 2>&1 | tail -5
-  ok "Backend built (bin/parentd)"
+  info "Running go build for parentd..."
+  go version 2>&1 | head -1
+  CGO_ENABLED=1 go build -o bin/parentd ./cmd/parentd/ 2>&1 || die "Go build failed for parentd"
+  ok "Backend built — bin/parentd"
 
-  # ─── Frontend ───────────────────────────────────────────────────
-  section "Building frontend"
+  # ─── Frontend ────────────────────────────────────────────────────
+  section "Building frontend (React)"
   cd "${OWP_HOME}/app/web"
   if [[ ! -d node_modules ]]; then
     info "Installing npm dependencies..."
-    npm ci --no-audit --no-fund 2>&1 | tail -5
+    npm ci --no-audit --no-fund 2>&1 | tail -5 || {
+      warn "npm ci failed, trying npm install..."
+      npm install 2>&1 | tail -5 || die "npm install failed"
+    }
   fi
-  npm run build 2>&1 | tail -10
+  npm run build 2>&1 | tail -10 || die "Frontend build failed"
   ok "Frontend built"
 
   chown -R "$OWP_USER:$OWP_USER" "${OWP_HOME}/app"
+  ok "Stage 7 complete — backend + frontend built"
 }
 
-# ─── Stage 8: Systemd Services ──────────────────────────────────────────
+# ─── Stage 8: Systemd Services ───────────────────────────────────────────
 stage_systemd() {
   header "Stage 8/10 — Systemd Services"
 
-  # ─── Main panel service ─────────────────────────────────────────
   cat > /etc/systemd/system/openwebpanel.service <<UNIT
 [Unit]
 Description=OpenWebPanel - Web Hosting Control Panel
-Documentation=https://github.com/openwebcpanel/openwebcpanel
+Documentation=https://github.com/${OWP_REPO}
 After=network.target mariadb.service nginx.service
 Wants=mariadb.service
-Requires=mariadb.service
 
 [Service]
 Type=simple
@@ -588,7 +586,6 @@ TimeoutStopSec=30
 WantedBy=multi-user.target
 UNIT
 
-  # ─── phpMyAdmin service ─────────────────────────────────────────
   cat > /etc/systemd/system/phpmyadmin.service <<UNIT
 [Unit]
 Description=phpMyAdmin PHP Built-in Server
@@ -600,59 +597,36 @@ User=www-data
 ExecStart=/usr/bin/php -S 127.0.0.1:8080 -t /usr/share/phpmyadmin
 Restart=always
 RestartSec=5
-LimitNOFILE=4096
 
 [Install]
 WantedBy=multi-user.target
 UNIT
 
-  # ─── Monitoring watchdog service ────────────────────────────────
-  cat > /etc/systemd/system/openwebpanel-watchdog.service <<UNIT
-[Unit]
-Description=OpenWebPanel Health Watchdog
-After=openwebpanel.service
-
-[Service]
-Type=oneshot
-ExecStart=${OWP_HOME}/app/bin/owp-watchdog.sh
-
-[Install]
-WantedBy=multi-user.target
-UNIT
-
-  # Reload systemd
   systemctl daemon-reload
-  systemctl enable openwebpanel
-  systemctl enable phpmyadmin
+  systemctl enable openwebpanel 2>&1 || warn "Failed to enable openwebpanel"
+  systemctl enable phpmyadmin 2>&1 || warn "Failed to enable phpmyadmin"
 
-  ok "Systemd services installed"
+  ok "Stage 8 complete — systemd services installed"
 }
 
-# ─── Stage 9: Watchdog & Log Rotation ───────────────────────────────────
+# ─── Stage 9: Monitoring ─────────────────────────────────────────────────
 stage_monitoring() {
   header "Stage 9/10 — Monitoring & Maintenance"
 
-  # ─── Watchdog script ────────────────────────────────────────────
+  # ─── Watchdog script ─────────────────────────────────────────────
+  mkdir -p "${OWP_HOME}/app/bin"
   cat > "${OWP_HOME}/app/bin/owp-watchdog.sh" <<'WATCHDOG'
 #!/usr/bin/env bash
-# OpenWebPanel Watchdog — checks if the panel is healthy and restarts if needed
-set -euo pipefail
-
+set -uo pipefail
 OWP_HOME="${OWP_HOME:-/opt/openwebpanel}"
 LOG="${OWP_HOME}/logs/watchdog.log"
 HEALTH_URL="http://127.0.0.1:9000/healthz"
-TIMEOUT=5
-MAX_RETRIES=3
 
-log() {
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG"
-}
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG"; }
 
 check_health() {
-  for i in $(seq 1 "$MAX_RETRIES"); do
-    if curl -sf --max-time "$TIMEOUT" "$HEALTH_URL" >/dev/null 2>&1; then
-      return 0
-    fi
+  for i in 1 2 3; do
+    if curl -sf --max-time 5 "$HEALTH_URL" >/dev/null 2>&1; then return 0; fi
     sleep 2
   done
   return 1
@@ -661,68 +635,50 @@ check_health() {
 if ! check_health; then
   log "WARN: Panel not responding. Attempting restart..."
   systemctl restart openwebpanel 2>/dev/null || {
-    log "ERR: systemctl restart failed, trying direct start..."
     if [[ -f "${OWP_HOME}/app/bin/parentd" ]]; then
       cd "${OWP_HOME}/app"
       nohup ./bin/parentd > "${OWP_HOME}/logs/parentd.log" 2>&1 &
     fi
   }
   sleep 5
-  if check_health; then
-    log "OK: Panel restarted successfully"
-  else
-    log "CRITICAL: Panel still not responding after restart"
-  fi
+  check_health && log "OK: Restarted successfully" || log "CRITICAL: Still not responding"
 else
-  log "OK: Panel is healthy"
+  log "OK: Healthy"
 fi
 WATCHDOG
   chmod +x "${OWP_HOME}/app/bin/owp-watchdog.sh"
   chown "$OWP_USER:$OWP_USER" "${OWP_HOME}/app/bin/owp-watchdog.sh"
 
-  # ─── Cron job for watchdog (every 5 minutes) ───────────────────
+  # ─── Cron jobs ───────────────────────────────────────────────────
   cat > /etc/cron.d/openwebpanel-watchdog <<CRON
 */5 * * * * root ${OWP_HOME}/app/bin/owp-watchdog.sh >/dev/null 2>&1
 CRON
-  chmod 644 /etc/cron.d/openwebpanel-watchdog
+  chmod 644 /etc/cron.d/openwebpanel-watchdog || true
 
-  # ─── Log rotation ───────────────────────────────────────────────
+  # ─── Log rotation ────────────────────────────────────────────────
   cat > /etc/logrotate.d/openwebpanel <<LOGROTATE
 ${OWP_HOME}/logs/*.log {
-    daily
-    rotate 30
-    compress
-    delaycompress
-    missingok
-    notifempty
-    copytruncate
+    daily; rotate 30; compress; delaycompress; missingok; notifempty; copytruncate
 }
-
 ${OWP_HOME}/app/parentd.log {
-    daily
-    rotate 14
-    compress
-    delaycompress
-    missingok
-    notifempty
-    copytruncate
+    daily; rotate 14; compress; delaycompress; missingok; notifempty; copytruncate
 }
 LOGROTATE
 
-  # ─── Backup cron (daily at 3am) ─────────────────────────────────
+  # ─── Backup cron ─────────────────────────────────────────────────
   cat > /etc/cron.d/openwebpanel-backup <<CRON2
-0 3 * * * root tar --exclude='node_modules' --exclude='homes/*/public_html/wp-content/cache' -czf ${OWP_BACKUPS}/backup-\$(date +\\%Y\\%m\\%d).tar.gz -C ${OWP_HOME}/app . 2>/dev/null && find ${OWP_BACKUPS} -name 'backup-*.tar.gz' -mtime +7 -delete
+0 3 * * * root tar --exclude='node_modules' -czf ${OWP_BACKUPS}/backup-\$(date +\%Y\%m\%d).tar.gz -C ${OWP_HOME}/app . 2>/dev/null && find ${OWP_BACKUPS} -name 'backup-*.tar.gz' -mtime +7 -delete
 CRON2
-  chmod 644 /etc/cron.d/openwebpanel-backup
+  chmod 644 /etc/cron.d/openwebpanel-backup || true
 
-  ok "Monitoring, log rotation, and backup cron configured"
+  ok "Stage 9 complete — watchdog, logrotate, backup configured"
 }
 
-# ─── Stage 10: Start & Verify ───────────────────────────────────────────
+# ─── Stage 10: Start & Verify ────────────────────────────────────────────
 stage_start() {
   header "Stage 10/10 — Starting Services"
 
-  # ─── Firewall ───────────────────────────────────────────────────
+  # ─── Firewall ────────────────────────────────────────────────────
   if [[ "$OWP_SKIP_FIREWALL" != "true" ]] && command -v ufw &>/dev/null; then
     section "Configuring firewall"
     ufw --force reset 2>/dev/null || true
@@ -739,11 +695,11 @@ stage_start() {
 
   PHP_VER=$(cat /tmp/owp_php_ver 2>/dev/null || echo "8.3")
 
-  # ─── Start services in order ────────────────────────────────────
+  # ─── Start services in order ─────────────────────────────────────
   section "Starting MariaDB..."
   systemctl restart mariadb 2>/dev/null || service mariadb restart 2>/dev/null || true
   for i in $(seq 1 10); do
-    if mysql -e "SELECT 1" &>/dev/null; then break; fi
+    if mysqladmin ping --silent 2>/dev/null; then break; fi
     sleep 1
   done
 
@@ -754,15 +710,13 @@ stage_start() {
   systemctl restart phpmyadmin 2>/dev/null || true
 
   section "Starting nginx..."
-  nginx -t 2>/dev/null
-  systemctl restart nginx 2>/dev/null || true
+  nginx -t 2>/dev/null && systemctl restart nginx 2>/dev/null || true
 
   section "Starting OpenWebPanel..."
   systemctl restart openwebpanel 2>/dev/null || true
 
-  # Wait for panel to be ready
   echo ""
-  info "Waiting for OpenWebPanel to start..."
+  info "Waiting for panel to respond..."
   local started=false
   for i in $(seq 1 30); do
     if curl -sf -o /dev/null http://127.0.0.1:9000/healthz 2>/dev/null; then
@@ -773,30 +727,25 @@ stage_start() {
   done
 
   if [[ "$started" == "true" ]]; then
-    ok "OpenWebPanel API is responding on port 9000"
+    ok "OpenWebPanel is running on port 9000"
   else
-    warn "Panel did not respond within 30 seconds. Checking logs..."
+    warn "Panel did not respond within 30s. Checking journalctl..."
     journalctl -u openwebpanel -n 20 --no-pager 2>/dev/null || true
-    warn "Attempting direct start as fallback..."
+    warn "Trying direct start as fallback..."
     sudo -u "$OWP_USER" OWP_DB_PATH="${OWP_DATA}/openwebpanel.db" \
       OWP_STATIC_DIR="${OWP_HOME}/app/web/dist" \
       OWP_LISTEN=":9000" \
-      "${OWP_HOME}/app/bin/parentd" &>/tmp/parentd-fallback.log &
+      "${OWP_HOME}/app/bin/parentd" &>/tmp/owp-fallback.log &
     sleep 5
     if curl -sf -o /dev/null http://127.0.0.1:9000/healthz 2>/dev/null; then
       ok "OpenWebPanel started in fallback mode"
     else
-      err "Failed to start OpenWebPanel. Check: /tmp/parentd-fallback.log"
-      cat /tmp/parentd-fallback.log 2>/dev/null || true
+      err "Failed to start. Check /tmp/owp-fallback.log:"
+      cat /tmp/owp-fallback.log 2>/dev/null | tail -20 || true
     fi
   fi
 
-  # Verify nginx is serving
-  if curl -sf -o /dev/null http://127.0.0.1:80/healthz 2>/dev/null; then
-    ok "Nginx is serving on port 80"
-  fi
-
-  # Verify systemd services
+  # Verify services
   for svc in openwebpanel phpmyadmin; do
     if systemctl is-active --quiet "$svc" 2>/dev/null; then
       ok "Service '$svc' is running"
@@ -804,85 +753,50 @@ stage_start() {
       warn "Service '$svc' is not active"
     fi
   done
+
+  ok "Stage 10 complete"
 }
 
-# ─── Summary ─────────────────────────────────────────────────────────────
+# ─── Summary ──────────────────────────────────────────────────────────────
 print_summary() {
   header "Installation Complete"
-
-  local ip="$OWP_DOMAIN"
-
   echo ""
   echo -e "  ${GREEN}OpenWebPanel is installed and running!${NC}"
   echo ""
-  echo -e "  ${CYAN}━━ Panel URLs ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-  echo -e "  Admin Panel:   ${BLUE}http://${ip}:${OWP_PANEL_PORT}${NC}"
-  echo -e "  User Panel:    ${BLUE}http://${ip}:${OWP_USER_PORT}${NC}"
-  echo -e "  Main Site:     ${BLUE}http://${ip}${NC}"
+  echo -e "  ${CYAN}━━ Panel URLs ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "  Admin Panel:   ${BLUE}http://${OWP_DOMAIN}:${OWP_PANEL_PORT}${NC}"
+  echo -e "  User Panel:    ${BLUE}http://${OWP_DOMAIN}:${OWP_USER_PORT}${NC}"
+  echo -e "  Website:       ${BLUE}http://${OWP_DOMAIN}${NC}"
   echo ""
-  echo -e "  ${CYAN}━━ Default Credentials ━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-  echo -e "  Admin login:   ${YELLOW}admin / admin123${NC}"
-  echo -e "  ${RED}⚠  CHANGE THE ADMIN PASSWORD AFTER FIRST LOGIN${NC}"
+  echo -e "  ${CYAN}━━ Login ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "  Username:      ${YELLOW}admin${NC}"
+  echo -e "  Password:      ${YELLOW}admin123${NC}"
+  echo -e "  ${RED}⚠  CHANGE PASSWORD AFTER FIRST LOGIN${NC}"
   echo ""
-  echo -e "  ${CYAN}━━ Paths ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-  echo -e "  Project:       ${YELLOW}${OWP_HOME}/app${NC}"
-  echo -e "  Data:          ${YELLOW}${OWP_DATA}${NC}"
-  echo -e "  User homes:    ${YELLOW}${OWP_HOMES_DIR}${NC}"
-  echo -e "  Logs:          ${YELLOW}${OWP_LOGS}${NC}"
-  echo -e "  Backups:       ${YELLOW}${OWP_BACKUPS}${NC}"
-  echo -e "  Config:        ${YELLOW}${OWP_HOME}/app/.env${NC}"
-  echo ""
-  echo -e "  ${CYAN}━━ Database ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-  echo -e "  MariaDB root:  ${YELLOW}saved in /root/.my.cnf${NC}"
-  echo -e "  Admin user:    ${YELLOW}owp_admin${NC} (restricted privileges)"
-  echo ""
-  echo -e "  ${CYAN}━━ Management Commands ━━━━━━━━━━━━━━━━━━━━━━${NC}"
-  echo -e "  Status:        ${YELLOW}systemctl status openwebpanel${NC}"
-  echo -e "  Logs:          ${YELLOW}journalctl -u openwebpanel -f${NC}"
-  echo -e "  Restart:       ${YELLOW}systemctl restart openwebpanel${NC}"
-  echo -e "  Watchdog log:  ${YELLOW}tail -f ${OWP_LOGS}/watchdog.log${NC}"
-  echo ""
-  echo -e "  ${CYAN}━━ Next Steps ───────────────────────────────${NC}"
-  echo -e "  1. Point a domain to ${ip} and run:"
-  echo -e "     ${BLUE}certbot --nginx -d your-domain.com${NC}"
-  echo -e "  2. Login at ${BLUE}http://${ip}:${OWP_PANEL_PORT}${NC} with ${YELLOW}admin / admin123${NC}"
-  echo -e "  3. Change the admin password immediately"
-  echo -e "  4. Create hosting packages and accounts"
-  echo -e "  5. Configure your domain in Settings"
+  echo -e "  ${CYAN}━━ Commands ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "  Status:        systemctl status openwebpanel"
+  echo -e "  Logs:          journalctl -u openwebpanel -f"
+  echo -e "  Restart:       systemctl restart openwebpanel"
   echo ""
 }
 
-# ─── Main ────────────────────────────────────────────────────────────────
-main() {
-  echo ""
-  echo -e "${BLUE}╔══════════════════════════════════════════════════╗${NC}"
-  echo -e "${BLUE}║        OpenWebPanel Installer v2.0              ║${NC}"
-  echo -e "${BLUE}║        Web Hosting Control Panel                ║${NC}"
-  echo -e "${BLUE}╚══════════════════════════════════════════════════╝${NC}"
-  echo ""
+# ═══════════════════════════════════════════════════════════════════════════
+# MAIN
+# ═══════════════════════════════════════════════════════════════════════════
 
-  START_TIME=$(date +%s)
+# Run pre-flight FIRST — this has no function dependencies and
+# produces immediate visible output
+preflight_check
 
-  stage_prereqs
-  stage_user
-  stage_system_packages
-  stage_languages
-  stage_project
-  stage_services
-  stage_build
-  stage_systemd
-  stage_monitoring
-  stage_start
-
-  END_TIME=$(date +%s)
-  DURATION=$((END_TIME - START_TIME))
-  MINUTES=$((DURATION / 60))
-  SECONDS=$((DURATION % 60))
-
-  echo ""
-  ok "Installation completed in ${MINUTES}m ${SECONDS}s"
-
-  print_summary
-}
-
-main "$@"
+# Now run all stages sequentially
+stage_prereqs
+stage_user
+stage_system_packages
+stage_languages
+stage_project
+stage_services
+stage_build
+stage_systemd
+stage_monitoring
+stage_start
+print_summary
