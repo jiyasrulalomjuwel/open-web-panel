@@ -1,8 +1,8 @@
 [Unit]
 Description=OpenWebPanel Parent Daemon
 Documentation=https://github.com/openwebcpanel/openwebcpanel
-After=network.target mariadb.service nginx.service
-Wants=mariadb.service
+After=network.target mariadb.service
+Wants=mariadb.service nginx.service
 
 [Service]
 Type=simple
