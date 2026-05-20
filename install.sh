@@ -364,6 +364,9 @@ stage_services() {
   # ─── nginx ───────────────────────────────────────────────────────
   section "Configuring nginx"
   mkdir -p /etc/nginx/sites-enabled /etc/nginx/vhosts
+  # Give openwebpanel user write access to vhosts directory for domain management
+  chown -R "$OWP_USER:www-data" /etc/nginx/vhosts
+  chmod 750 /etc/nginx/vhosts
   rm -f /etc/nginx/sites-enabled/default
 
   cat > /etc/nginx/sites-available/openwebpanel << 'NGINX_CONF'
@@ -609,8 +612,8 @@ stage_systemd() {
 [Unit]
 Description=OpenWebPanel - Web Hosting Control Panel
 Documentation=https://github.com/${OWP_REPO}
-After=network.target mariadb.service nginx.service
-Wants=mariadb.service
+After=network.target mariadb.service
+Wants=mariadb.service nginx.service
 
 [Service]
 Type=simple
@@ -651,7 +654,17 @@ UNIT
   systemctl enable openwebpanel 2>&1 || warn "Failed to enable openwebpanel"
   systemctl enable phpmyadmin 2>&1 || warn "Failed to enable phpmyadmin"
 
-  ok "Stage 8 complete — systemd services installed"
+  # ─── Sudoers: allow openwebpanel user to reload nginx ─────────────
+  cat > /etc/sudoers.d/openwebpanel <<SUDOERS
+# Allow OpenWebPanel to reload nginx when vhost configs change
+${OWP_USER} ALL=(root) NOPASSWD: /usr/sbin/nginx
+${OWP_USER} ALL=(root) NOPASSWD: /usr/bin/systemctl reload nginx
+${OWP_USER} ALL=(root) NOPASSWD: /usr/bin/systemctl reload nginx.service
+SUDOERS
+  chmod 440 /etc/sudoers.d/openwebpanel
+  visudo -c -f /etc/sudoers.d/openwebpanel 2>/dev/null || rm -f /etc/sudoers.d/openwebpanel
+
+  ok "Stage 8 complete — systemd services + sudoers installed"
 }
 
 # ─── Stage 9: Monitoring ─────────────────────────────────────────────────
@@ -758,7 +771,11 @@ stage_start() {
   nginx -t 2>/dev/null && systemctl restart nginx 2>/dev/null || true
 
   section "Starting OpenWebPanel..."
-  systemctl restart openwebpanel 2>/dev/null || true
+  # Show any startup errors instead of hiding them
+  systemctl start openwebpanel 2>&1 || {
+    warn "systemd start failed, showing journal:"
+    journalctl -u openwebpanel -n 15 --no-pager 2>/dev/null || true
+  }
 
   echo ""
   info "Waiting for panel to respond..."
@@ -774,28 +791,56 @@ stage_start() {
   if [[ "$started" == "true" ]]; then
     ok "OpenWebPanel is running on port 9000"
   else
-    warn "Panel did not respond within 30s. Checking journalctl..."
-    journalctl -u openwebpanel -n 20 --no-pager 2>/dev/null || true
-    warn "Trying direct start as fallback..."
-    sudo -u "$OWP_USER" OWP_DB_PATH="${OWP_DATA}/openwebpanel.db" \
+    warn "Panel did not respond within 30s. Checking journal..."
+    journalctl -u openwebpanel -n 30 --no-pager 2>/dev/null || true
+    warn "Trying direct start as fallback (all env vars)..."
+    sudo -u "$OWP_USER" \
+      OWP_JWT_SECRET="${OWP_JWT_SECRET}" \
+      OWP_DB_PATH="${OWP_DATA}/openwebpanel.db" \
       OWP_STATIC_DIR="${OWP_HOME}/app/web/dist" \
       OWP_LISTEN=":9000" \
+      OWP_HOMES_BASE="${OWP_HOMES_DIR}/" \
+      OWP_PUBLIC_HOST="${OWP_DOMAIN}:9000" \
+      OWP_SHARED_IP="127.0.0.1" \
+      OWP_SMTP_PORT="2525" \
+      NGINX_PREFIX="/etc/nginx" \
+      NGINX_VHOST_DIR="/etc/nginx/vhosts" \
+      NGINX_BIN="/usr/sbin/nginx" \
+      NGINX_CONF="/etc/nginx/nginx.conf" \
+      NGINX_LOG_DIR="/var/log/nginx" \
+      PHP_FPM_SOCKET="/run/php/php${PHP_VER}-fpm.sock" \
+      MYSQL_ROOT_PASSWORD="${OWP_MYSQL_ROOT_PW}" \
+      MYSQL_ADMIN_PASSWORD="${OWP_MYSQL_ADMIN_PW}" \
       "${OWP_HOME}/app/bin/parentd" &>/tmp/owp-fallback.log &
     sleep 5
     if curl -sf -o /dev/null http://127.0.0.1:9000/healthz 2>/dev/null; then
       ok "OpenWebPanel started in fallback mode"
+      warn "Systemd service may still have issues — check: journalctl -u openwebpanel"
     else
-      err "Failed to start. Check /tmp/owp-fallback.log:"
-      cat /tmp/owp-fallback.log 2>/dev/null | tail -20 || true
+      err "Failed to start panel. Last 30 lines of log:"
+      tail -30 /tmp/owp-fallback.log 2>/dev/null || true
+      err "Journal for openwebpanel:"
+      journalctl -u openwebpanel -n 20 --no-pager 2>/dev/null || true
+      err "Binary exists: $([ -f "${OWP_HOME}/app/bin/parentd" ] && echo 'YES' || echo 'MISSING!')"
+      err "Env file: $([ -f "${OWP_HOME}/app/.env" ] && echo 'EXISTS' || echo 'MISSING!')"
     fi
   fi
 
   # Verify services
-  for svc in openwebpanel phpmyadmin; do
+  for svc in openwebpanel phpmyadmin nginx mariadb; do
     if systemctl is-active --quiet "$svc" 2>/dev/null; then
       ok "Service '$svc' is running"
     else
       warn "Service '$svc' is not active"
+    fi
+  done
+
+  # Verify auto-start on boot
+  for svc in openwebpanel phpmyadmin nginx mariadb; do
+    if systemctl is-enabled --quiet "$svc" 2>/dev/null; then
+      ok "Service '$svc' auto-start enabled"
+    else
+      warn "Service '$svc' is NOT enabled for auto-start"
     fi
   done
 

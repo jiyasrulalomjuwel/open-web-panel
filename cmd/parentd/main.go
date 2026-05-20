@@ -1313,7 +1313,12 @@ func removeNginxVhost(domain string) error {
 }
 
 func reloadNginx() {
-	runCmd(nginxBin, "-s", "reload")
+	// Try sudo first (configured during install), fall back to direct
+	if out, err := runCmd("sudo", "-n", nginxBin, "-s", "reload"); err != nil {
+		runCmd(nginxBin, "-s", "reload")
+	} else {
+		_ = out
+	}
 }
 func auditLog(db *sql.DB, r *http.Request, action string, details interface{}) {
 	c := getClaims(r)
@@ -3043,25 +3048,8 @@ func main() {
 	log.Printf("OpenWebPanel Parent Daemon on %s (db: %s)", listenAddr, dbPath)
 	log.Printf("Default login: admin / admin123")
 
-	// Sync nginx vhosts for all domains before starting nginx
+	// Sync nginx vhosts for all domains for all active domains
 	syncNginxVhosts(database)
-
-	// Start nginx on port 80
-	if _, err := os.Stat(nginxBin); err == nil {
-		if _, err := os.Stat(nginxConf); err == nil {
-			exec.Command("pkill", "-f", nginxBin).Run()
-			time.Sleep(300 * time.Millisecond)
-			nginxCmd := exec.Command(nginxBin, "-c", nginxConf)
-			nginxCmd.Stdout = nil
-			nginxCmd.Stderr = nil
-			if err := nginxCmd.Start(); err == nil {
-				go nginxCmd.Wait()
-				log.Printf("Nginx started (ports 80/2082/2086, pid %d)", nginxCmd.Process.Pid)
-			} else {
-				log.Printf("Nginx start failed: %v", err)
-			}
-		}
-	}
 
 	if err := http.ListenAndServe(listenAddr, r); err != nil {
 		log.Fatalf("Server error: %v", err)
