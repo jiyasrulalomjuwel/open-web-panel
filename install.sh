@@ -17,10 +17,8 @@
 # Do NOT use set -e — we handle errors manually so output is always visible
 set -uo pipefail
 
-# ─── Force unbuffered output so every line shows immediately ──────────────
+# ─── Force noninteractive apt so install never hangs on prompts ───────────
 export DEBIAN_FRONTEND=noninteractive
-export SHELLOPTS
-[[ -t 1 ]] || exec stdbuf -oL -eL bash 2>/dev/null || true
 
 # ─── Config ───────────────────────────────────────────────────────────────
 OWP_VERSION="${OWP_VERSION:-main}"
