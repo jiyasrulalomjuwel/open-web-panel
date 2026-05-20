@@ -308,7 +308,11 @@ stage_languages() {
 
   if [[ "${NODE_EXISTS:-false}" != "true" ]]; then
     info "Installing Node.js ${OWP_NODE_VERSION}.x..."
-    curl -fsSL "https://deb.nodesource.com/setup_${OWP_NODE_VERSION}.x" | bash - 2>&1 | tail -3 || die "Failed to setup NodeSource repo"
+    # Download the NodeSource script (don't pipe to bash to avoid set -u conflicts)
+    curl -fsSL "https://deb.nodesource.com/setup_${OWP_NODE_VERSION}.x" -o /tmp/nodesource.sh 2>&1 || die "Failed to download NodeSource setup"
+    # Run with set +u so NodeSource's unbound vars don't crash us
+    bash -c "set +eu; source /tmp/nodesource.sh" 2>&1 | tail -5 || die "Failed to setup NodeSource repo"
+    rm -f /tmp/nodesource.sh
     wait_for_dpkg
     apt-get install -y -qq nodejs 2>&1 | tail -3 || die "Failed to install Node.js"
     ok "Node.js $(node -v) installed"
