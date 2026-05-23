@@ -411,6 +411,17 @@ func initDB(path string) (*sql.DB, error) {
 			created_at      TEXT DEFAULT (datetime('now')),
 			updated_at      TEXT DEFAULT (datetime('now'))
 		);
+
+		CREATE TABLE IF NOT EXISTS error_pages (
+			id              INTEGER PRIMARY KEY AUTOINCREMENT,
+			account_id      INTEGER NOT NULL,
+			domain_id       INTEGER NOT NULL,
+			domain          TEXT NOT NULL,
+			error_code      INTEGER NOT NULL,
+			content         TEXT DEFAULT '',
+			created_at      TEXT DEFAULT (datetime('now')),
+			UNIQUE(domain_id, error_code)
+		);
 	`
 
 	if _, err := db.Exec(schema); err != nil {
@@ -463,7 +474,12 @@ func seedDefaultData(db *sql.DB) {
 
 	db.QueryRow("SELECT COUNT(*) FROM admins").Scan(&count)
 	if count == 0 {
-		hash, _ := auth.HashPassword("admin123")
+		adminPass := os.Getenv("OWP_ADMIN_PASSWORD")
+		if adminPass == "" {
+			adminPass = "admin123"
+			log.Println("WARNING: Using default admin password. Set OWP_ADMIN_PASSWORD for security.")
+		}
+		hash, _ := auth.HashPassword(adminPass)
 		db.Exec(`INSERT INTO admins (username, password_hash, role) VALUES ('admin', ?, 'root')`, hash)
 	}
 
@@ -2969,6 +2985,10 @@ func main() {
 				r.Use(authMw(jwtManager), trackBandwidth(database))
 				childStatsRoutes(r, database)
 			})
+			r.Route("/api/v1/child/errors", func(r chi.Router) {
+				r.Use(authMw(jwtManager), trackBandwidth(database))
+				childErrorRoutes(r, database)
+			})
 
 
 		// ACME HTTP-01 challenge handler (for Let's Encrypt)
@@ -3049,7 +3069,11 @@ func main() {
 	}()
 
 	log.Printf("OpenWebPanel Parent Daemon on %s (db: %s)", listenAddr, dbPath)
-	log.Printf("Default login: admin / admin123")
+	adminPass := os.Getenv("OWP_ADMIN_PASSWORD")
+	if adminPass == "" {
+		adminPass = "admin123"
+	}
+	log.Printf("Default login: admin / %s", adminPass)
 
 	// Sync nginx vhosts for all domains for all active domains
 	syncNginxVhosts(database)

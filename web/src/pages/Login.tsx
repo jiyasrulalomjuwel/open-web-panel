@@ -252,7 +252,7 @@ export function Login() {
             className="mt-6 text-xs text-gray-400 dark:text-gray-500 text-center"
           >
             {mode === 'parent'
-              ? 'Default: admin / admin123'
+              ? 'Default: admin (password set during installation)'
               : 'Use the credentials from your hosting account'}
           </motion.p>
         </div>

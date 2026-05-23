@@ -308,6 +308,13 @@ export const createFTPAccount = (data: any) => request('POST', '/child/ftp', dat
 export const updateFTPAccount = (id: number, data: any) => request('PUT', `/child/ftp/${id}`, data);
 export const deleteFTPAccount = (id: number) => request('DELETE', `/child/ftp/${id}`);
 
+// Error Pages
+export const getRecentErrors = () => request('GET', '/child/errors/recent');
+export const getCustomErrorPages = () => request('GET', '/child/errors/custom');
+export const getCustomErrorContent = (id: number) => request('GET', `/child/errors/custom/${id}`);
+export const saveCustomErrorPage = (data: any) => request('PUT', '/child/errors/custom', data);
+export const deleteCustomErrorPage = (id: number) => request('DELETE', `/child/errors/custom/${id}`);
+
 // Submissions
 export const getSubmissions = (params?: any) => request('GET', '/submissions' + (params ? '?' + new URLSearchParams(params).toString() : ''));
 export const deleteSubmission = (id: number) => request('DELETE', `/submissions/${id}`);

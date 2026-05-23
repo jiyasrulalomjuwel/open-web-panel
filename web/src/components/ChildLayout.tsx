@@ -1,29 +1,85 @@
-import { useState } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { useState, useCallback } from 'react';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FolderOpen, Database, LayoutDashboard, Globe, LifeBuoy, BarChart3, Globe2, Shield, LogOut, ChevronLeft, Menu, Mail, Inbox, Sun, Moon, Server } from 'lucide-react';
+import { FolderOpen, Database, LayoutDashboard, Globe, LifeBuoy, BarChart3, Globe2, Shield, LogOut, ChevronLeft, Menu, Mail, Inbox, Sun, Moon, Server, ChevronDown, ChevronRight, Gauge, HardDrive, ArrowLeftRight, Ban, BarChartHorizontal, Bug } from 'lucide-react';
 import { clearTokens, getUser } from '../lib/api';
 
-const nav = [
+type NavGroup = {
+  label: string;
+  icon: any;
+  children: { to: string; label: string }[];
+};
+
+const groups: NavGroup[] = [
+  {
+    label: 'Web',
+    icon: Globe,
+    children: [
+      { to: '/child/domains', label: 'Domains' },
+      { to: '/child/cms', label: 'CMS Installer' },
+      { to: '/child/ssl', label: 'SSL Certs' },
+      { to: '/child/redirects', label: 'Redirects' },
+      { to: '/child/hotlink', label: 'Hotlink Protection' },
+      { to: '/child/stats', label: 'Stats' },
+      { to: '/child/errors', label: 'Error Manager' },
+    ],
+  },
+  {
+    label: 'Files',
+    icon: FolderOpen,
+    children: [
+      { to: '/child/files', label: 'File Manager' },
+      { to: '/child/ftp', label: 'FTP Manager' },
+    ],
+  },
+  {
+    label: 'Email',
+    icon: Mail,
+    children: [
+      { to: '/child/emails', label: 'Emails' },
+      { to: '/child/webmail', label: 'Webmail' },
+    ],
+  },
+  {
+    label: 'System',
+    icon: HardDrive,
+    children: [
+      { to: '/child/bandwidth', label: 'Bandwidth' },
+      { to: '/child/tickets', label: 'Support' },
+    ],
+  },
+];
+
+const standalone = [
   { to: '/child/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/child/files', icon: FolderOpen, label: 'File Manager' },
   { to: '/child/databases', icon: Database, label: 'Databases' },
-  { to: '/child/domains', icon: Globe, label: 'Domains' },
-  { to: '/child/ftp', icon: Server, label: 'FTP Manager' },
-  { to: '/child/cms', icon: Globe2, label: 'CMS Installer' },
-  { to: '/child/ssl', icon: Shield, label: 'SSL Certs' },
-  { to: '/child/emails', icon: Mail, label: 'Emails' },
-  { to: '/child/webmail', icon: Inbox, label: 'Webmail' },
-  { to: '/child/bandwidth', icon: BarChart3, label: 'Bandwidth' },
-  { to: '/child/tickets', icon: LifeBuoy, label: 'Support' },
 ];
 
 export function ChildLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(document.documentElement.classList.contains('dark'));
+  const [openGroups, setOpenGroups] = useState<Set<string>>(() => {
+    const saved = localStorage.getItem('owp_child_nav_groups');
+    return saved ? new Set(JSON.parse(saved)) : new Set();
+  });
   const navigate = useNavigate();
+  const location = useLocation();
   const user = getUser();
+
+  const toggleGroup = useCallback((label: string) => {
+    setOpenGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      localStorage.setItem('owp_child_nav_groups', JSON.stringify([...next]));
+      return next;
+    });
+  }, []);
+
+  const isChildActive = useCallback((paths: string[]) => {
+    return paths.some(p => location.pathname === p || location.pathname.startsWith(p + '/'));
+  }, [location.pathname]);
 
   const toggleDark = () => {
     const next = !darkMode;
@@ -35,6 +91,22 @@ export function ChildLayout() {
     clearTokens();
     navigate('/login');
   };
+
+  const closeMobile = () => setMobileOpen(false);
+
+  const linkClass = ({ isActive }: { isActive: boolean }) =>
+    `flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
+      isActive
+        ? 'bg-emerald-600 text-white'
+        : 'text-emerald-100 hover:bg-emerald-800 hover:text-white'
+    }`;
+
+  const subLinkClass = ({ isActive }: { isActive: boolean }) =>
+    `flex items-center gap-3 px-3 py-1.5 rounded-md text-sm transition-colors ${
+      isActive
+        ? 'bg-emerald-600 text-white'
+        : 'text-emerald-200 hover:bg-emerald-800 hover:text-white'
+    }`;
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-950">
@@ -86,31 +158,71 @@ export function ChildLayout() {
           </div>
         </div>
 
-        <nav className="flex-1 py-3 space-y-1 px-2 overflow-hidden">
-          {nav.map(({ to, icon: Icon, label }, i) => (
-            <motion.div
+        <nav className="flex-1 overflow-y-auto py-3 space-y-1 px-2 scrollbar-thin scrollbar-thumb-emerald-700 scrollbar-track-transparent">
+          {/* Standalone items */}
+          {standalone.map(({ to, icon: Icon, label }) => (
+            <NavLink
               key={to}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.05 }}
+              to={to}
+              onClick={closeMobile}
+              className={linkClass}
             >
-              <NavLink
-                key={to}
-                to={to}
-                onClick={() => setMobileOpen(false)}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
-                    isActive
-                      ? 'bg-emerald-600 text-white'
-                      : 'text-emerald-100 hover:bg-emerald-800 hover:text-white'
-                  }`
-                }
-              >
-                <Icon className="h-4 w-4 shrink-0" />
-                {!collapsed && <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }}>{label}</motion.span>}
-              </NavLink>
-            </motion.div>
+              <Icon className="h-4 w-4 shrink-0" />
+              {!collapsed && <span>{label}</span>}
+            </NavLink>
           ))}
+
+          {/* Grouped items */}
+          {groups.map(g => {
+            const groupActive = isChildActive(g.children.map(c => c.to));
+            const isOpen = openGroups.has(g.label);
+            return (
+              <div key={g.label}>
+                {collapsed ? (
+                  <div className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-emerald-100">
+                    <g.icon className="h-4 w-4 shrink-0" />
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => toggleGroup(g.label)}
+                    className={`flex items-center gap-3 w-full px-3 py-2 rounded-md text-sm transition-colors ${
+                      groupActive
+                        ? 'bg-emerald-700/60 text-white'
+                        : 'text-emerald-100 hover:bg-emerald-800 hover:text-white'
+                    }`}
+                  >
+                    <g.icon className="h-4 w-4 shrink-0" />
+                    <span className="flex-1 text-left">{g.label}</span>
+                    {isOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                  </button>
+                )}
+                <AnimatePresence initial={false}>
+                  {!collapsed && isOpen && (
+                    <motion.div
+                      key={g.label}
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.15 }}
+                      className="ml-2 mt-0.5 space-y-0.5 border-l border-emerald-700/50 pl-2 overflow-hidden"
+                    >
+                      {g.children.map(c => (
+                        <NavLink
+                          key={c.to}
+                          to={c.to}
+                          onClick={closeMobile}
+                          className={subLinkClass}
+                        >
+                          <span className="h-1 w-1 rounded-full bg-emerald-400 shrink-0" />
+                          <span>{c.label}</span>
+                        </NavLink>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            );
+          })}
         </nav>
 
         <div className="border-t border-emerald-700 dark:border-gray-700 p-3 space-y-2 shrink-0">

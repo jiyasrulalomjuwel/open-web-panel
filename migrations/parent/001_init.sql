@@ -85,7 +85,8 @@ CREATE TABLE IF NOT EXISTS server_config (
 INSERT INTO packages (name, is_default) VALUES ('default', TRUE)
 ON DUPLICATE KEY UPDATE name = name;
 
--- Default root admin (password: admin123 — CHANGE ON FIRST LOGIN)
+-- Default root admin (password set via OWP_ADMIN_PASSWORD env var, default: admin123)
+-- During automated installation, the password is randomly generated and stored in .env
 INSERT INTO admins (username, password_hash, role)
 VALUES ('admin', '$2a$12$LJ3m4ys3GZfnYMz8kVsKaOTSxL0OPhGJDAh0tXHE6C3vYQKQIXzO.', 'root')
 ON DUPLICATE KEY UPDATE username = username;

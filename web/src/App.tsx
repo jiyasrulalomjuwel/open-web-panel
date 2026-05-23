@@ -24,6 +24,7 @@ import { ToastProvider } from './components/ToastProvider';
 import { Redirects } from './pages/Redirects';
 import { HotlinkProtection } from './pages/HotlinkProtection';
 import { Stats } from './pages/Stats';
+import { ErrorManager } from './pages/ErrorManager';
 import { Onboarding } from './pages/Onboarding';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -105,6 +106,7 @@ export default function App() {
               <Route path="redirects" element={<PageTransition><Redirects /></PageTransition>} />
               <Route path="hotlink" element={<PageTransition><HotlinkProtection /></PageTransition>} />
               <Route path="stats" element={<PageTransition><Stats /></PageTransition>} />
+              <Route path="errors" element={<PageTransition><ErrorManager /></PageTransition>} />
             </Route>
             <Route path="/onboarding" element={<PageTransition><Onboarding /></PageTransition>} />
           </Routes>

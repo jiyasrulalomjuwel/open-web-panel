@@ -32,7 +32,7 @@ echo ""
 echo "=== OpenWebPanel is running ==="
 echo "  Frontend:  http://${SHARED_IP}:5173"
 echo "  Backend:   http://${SHARED_IP}:9000"
-echo "  Login:     admin / admin123"
+echo "  Login:     admin (password set via OWP_ADMIN_PASSWORD or .env)"
 echo ""
 echo "Press Ctrl+C to stop both services"
 

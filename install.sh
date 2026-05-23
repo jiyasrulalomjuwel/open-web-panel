@@ -560,9 +560,13 @@ stage_build() {
   export PATH="/usr/local/go/bin:$PATH"
   PHP_VER=$(cat /tmp/owp_php_ver 2>/dev/null || echo "8.3")
 
-  # ─── Environment file ────────────────────────────────────────────
-  section "Writing .env configuration"
-  cat > "${OWP_HOME}/app/.env" <<EOF
+	# ─── Generate random admin panel password ────────────────────────
+	OWP_ADMIN_PW="$(gen_password 12)"
+	debug "Admin panel password: $OWP_ADMIN_PW"
+
+	# ─── Environment file ────────────────────────────────────────────
+	section "Writing .env configuration"
+	cat > "${OWP_HOME}/app/.env" <<EOF
 OWP_JWT_SECRET=${OWP_JWT_SECRET}
 OWP_DB_PATH=${OWP_DATA}/openwebpanel.db
 OWP_STATIC_DIR=${OWP_HOME}/app/web/dist
@@ -580,6 +584,7 @@ PHP_FPM_SOCKET=/run/php/php${PHP_VER}-fpm.sock
 MYSQL_ROOT_PASSWORD=${OWP_MYSQL_ROOT_PW}
 MYSQL_ADMIN_PASSWORD=${OWP_MYSQL_ADMIN_PW}
 OWP_SMTP_PORT=2525
+OWP_ADMIN_PASSWORD=${OWP_ADMIN_PW}
 EOF
   chmod 600 "${OWP_HOME}/app/.env"
   chown "$OWP_USER:$OWP_USER" "${OWP_HOME}/app/.env"
@@ -864,10 +869,10 @@ print_summary() {
   echo -e "  User Panel:    ${BLUE}http://${OWP_DOMAIN}:${OWP_USER_PORT}${NC}"
   echo -e "  Website:       ${BLUE}http://${OWP_DOMAIN}${NC}"
   echo ""
-  echo -e "  ${CYAN}━━ Login ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-  echo -e "  Username:      ${YELLOW}admin${NC}"
-  echo -e "  Password:      ${YELLOW}admin123${NC}"
-  echo -e "  ${RED}⚠  CHANGE PASSWORD AFTER FIRST LOGIN${NC}"
+	echo -e "  ${CYAN}━━ Login ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+	echo -e "  Username:      ${YELLOW}admin${NC}"
+	echo -e "  Password:      ${YELLOW}${OWP_ADMIN_PW}${NC}"
+	echo -e "  ${RED}⚠  SAVE THIS PASSWORD — it will not be shown again${NC}"
   echo ""
   echo -e "  ${CYAN}━━ Commands ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
   echo -e "  Status:        systemctl status openwebpanel"

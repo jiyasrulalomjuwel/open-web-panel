@@ -1,57 +1,91 @@
 # OpenWebPanel
 
-A lightweight web hosting control panel built with Go and React. Manage websites, databases, emails, DNS, SSL certificates, and more — all from a clean web interface.
+A lightweight, self-hosted web hosting control panel built with **Go** and **React**. Manage websites, databases, emails, SSL certificates, FTP accounts, and more — all from a clean web interface.
 
 ![Go](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)
 ![React](https://img.shields.io/badge/React-18.3-61DAFB?logo=react)
-![License](https://img.shields.io/badge/license-MIT-green)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
-## Features
+---
 
-- **Hosting Accounts** — Create and manage hosting accounts with resource limits
-- **File Manager** — Browse, upload, edit, and manage files via browser
-- **Database Manager** — MariaDB database creation and phpMyAdmin integration
-- **Domain Manager** — Addon/parked/subdomain management with auto-Nginx vhosts
-- **Email** — Email accounts, webmail, forwards, and built-in SMTP server
-- **DNS Editor** — Manage A, AAAA, CNAME, MX, TXT records
-- **SSL Certificates** — Let's Encrypt auto-renewal
-- **CMS Installer** — One-click WordPress and other CMS installations
-- **FTP Accounts** — Isolated FTP access per account
-- **Backups** — Automated backup and restore
-- **Bandwidth Monitoring** — Track usage per account
-- **Cron Jobs** — User-managed scheduled tasks
-- **phpMyAdmin** — Integrated database management
-- **One-Click Install** — Single-command Ubuntu/Debian installer
+## ✨ Features
 
-## Quick Start
+| Category | Features |
+|---|---|
+| **Hosting Accounts** | Create/manage accounts with resource limits (disk, bandwidth, databases, email, FTP) |
+| **File Manager** | Browser-based file browsing, upload, edit, extract, and management |
+| **Database Manager** | MariaDB user databases + integrated phpMyAdmin |
+| **Domain Manager** | Addon domains, parked domains, subdomains — auto-Nginx vhost generation |
+| **Email** | Email accounts, webmail (Roundcube), built-in SMTP server, forwards |
+| **SSL Certificates** | Let's Encrypt auto-renewal, custom SSL upload |
+| **CMS Installer** | One-click WordPress and other CMS installations |
+| **FTP Accounts** | Per-account isolated FTP access |
+| **Bandwidth Monitoring** | Track usage per account via Nginx logs + SMTP |
+| **Custom Error Pages** | Per-domain custom 404/500/etc. error pages served by Nginx |
+| **Hotlink Protection** | Protect your media from hotlinking |
+| **Redirects** | URL redirection management |
+| **PHP** | Per-domain PHP-FPM socket support |
+| **Backups** | Automated nightly backups |
+| **Cron Jobs** | User-managed scheduled tasks |
+
+---
+
+## 🚀 Quick Install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/jiyasrulalomjuwel/open-web-panel/main/install.sh | sudo bash
 ```
 
-The installer auto-detects your system and sets up everything in ~10-15 minutes.
+The installer auto-detects your system and provisions everything in **~10–15 minutes**.
 
-### After Install
+### What it sets up
+
+- Nginx (reverse proxy + website vhosts)
+- MariaDB (user databases)
+- PHP-FPM (configurable version)
+- phpMyAdmin
+- Go backend (REST API)
+- React frontend (admin panel + user panel)
+- SMTP server (incoming mail)
+- Firewall rules (UFW)
+- Watchdog + log rotation + nightly backups
+
+### After Installation
 
 | URL | Description |
 |---|---|
-| `http://your-server:2086` | Admin Panel |
-| `http://your-server:2082` | User Panel |
-| `http://your-server` | Main Site (port 80) |
+| `http://your-server:2086` | **Admin Panel** — manage accounts, packages, settings |
+| `http://your-server:2082` | **User Panel** — your hosting clients manage their sites |
+| `http://your-server` | Main website (port 80) |
 
-**Default login:** `admin` / `admin123`
+The admin password is **randomly generated** during installation and printed at the end. It is also stored in `/opt/openwebpanel/app/.env`.
 
-## Architecture
+### Custom Installation
+
+```bash
+# Specify a domain/IP
+sudo OWP_DOMAIN=panel.example.com bash install.sh
+
+# Use custom ports
+sudo OWP_PANEL_PORT=8443 OWP_USER_PORT=8444 bash install.sh
+
+# Skip firewall or swap
+sudo OWP_SKIP_FIREWALL=true OWP_SKIP_SWAP=true bash install.sh
+```
+
+---
+
+## 🏗 Architecture
 
 ```
 ┌─────────────┐     ┌──────────────┐     ┌─────────────┐
-│  Nginx      │────▶│  parentd     │────▶│  SQLite     │
+│   Nginx     │────▶│   parentd    │────▶│   SQLite    │
 │  (80/2086   │     │  (Go API)    │     │  (Panel DB) │
-│   /2082)    │     │  :9000       │     │             │
+│   /2082)    │     │   :9000      │     │             │
 └─────────────┘     └──────┬───────┘     └─────────────┘
                            │
 ┌─────────────┐     ┌──────┴───────┐     ┌─────────────┐
-│  MariaDB    │◀────│  childd      │     │  React SPA  │
+│   MariaDB   │◀────│   childd     │     │  React SPA  │
 │  (User DBs) │     │  (User File  │     │  (Served by │
 │             │     │   Server)    │     │   parentd)  │
 └─────────────┘     └──────────────┘     └─────────────┘
@@ -59,33 +93,47 @@ The installer auto-detects your system and sets up everything in ~10-15 minutes.
 
 ### Components
 
-- **parentd** — Main daemon: REST API, SQLite panel DB, Nginx vhost management, SMTP server, cron runner, SSL renewal
-- **childd** — Per-user file server with path traversal protection
-- **Web UI** — React SPA with admin panel (port 2086) and user panel (port 2082)
-- **Nginx** — Reverse proxy for the panel and user websites
-- **MariaDB** — User hosting databases (separate from the panel's SQLite DB)
+- **`parentd`** — Main Go daemon: REST API, SQLite panel database, Nginx vhost management, SMTP server, cron runner, SSL renewal. Runs on port `:9000`.
+- **`childd`** — Per-user file server with path traversal protection.
+- **Web UI** — React SPA served by `parentd`. Admin panel on port `2086`, user panel on port `2082`.
+- **Nginx** — Reverse proxy for the panel UI + serves user websites with PHP-FPM.
+- **MariaDB** — MySQL-compatible database for user websites (separate from the panel's SQLite DB).
 
-## Requirements
+---
 
-- **OS:** Ubuntu 20.04+ or Debian 11+
-- **RAM:** 1GB minimum (swap auto-created if less)
-- **Disk:** 5GB+ free
-- **Arch:** x86_64 or ARM64
+## 📋 Requirements
 
-## Development
+| Requirement | Minimum |
+|---|---|
+| **OS** | Ubuntu 20.04+ or Debian 11+ |
+| **RAM** | 1 GB (swap auto-created if less) |
+| **Disk** | 5 GB+ free |
+| **Arch** | x86_64 or ARM64 |
+| **Root access** | Required for installation |
+
+---
+
+## 🛠 Development
 
 ```bash
-# Clone the repo
 git clone https://github.com/jiyasrulalomjuwel/open-web-panel.git
 cd open-web-panel
 
-# Build and run the backend
-make dev-backend
+# Build backend
+go build -o bin/parentd ./cmd/parentd/
 
-# In another terminal, run the frontend
-make dev-frontend
+# Build frontend
+cd web && npm install && npm run build && cd ..
 
-# Or use the dev script
+# Run (with env vars)
+OWP_DB_PATH=./openwebpanel.db \
+OWP_STATIC_DIR=./web/dist \
+OWP_LISTEN=:9000 \
+sudo -E ./bin/parentd
+```
+
+Or use the development script:
+```bash
 sudo bash dev.sh
 ```
 
@@ -93,60 +141,55 @@ sudo bash dev.sh
 
 ```
 ├── cmd/
-│   ├── parentd/       # Main admin panel API daemon
-│   └── childd/        # Per-user file server
+│   ├── parentd/          # Main admin panel daemon (Go)
+│   └── childd/           # Per-user file server (Go)
 ├── internal/
-│   ├── parent/        # Admin-specific logic (accounts, packages)
-│   │   ├── accounts/
-│   │   ├── api/
-│   │   └── packages/
-│   └── shared/        # Shared libraries
-│       ├── audit/     # Audit logging
-│       ├── auth/      # JWT + bcrypt authentication
-│       ├── config/    # Configuration management
-│       ├── db/        # Database connectors (SQLite + MariaDB)
-│       ├── filesystem/# Path traversal safe file operations
-│       ├── logging/   # Logging utilities
-│       └── middleware/# HTTP middleware (auth, CORS, logging)
-├── web/               # React frontend
+│   ├── parent/           # Admin-specific business logic
+│   │   ├── accounts/     # Account CRUD
+│   │   ├── api/          # API handlers
+│   │   └── packages/     # Package management
+│   └── shared/           # Shared libraries
+│       ├── audit/        # Audit logging
+│       ├── auth/         # JWT + bcrypt authentication
+│       ├── config/       # Configuration
+│       ├── db/           # SQLite + MariaDB connectors
+│       ├── filesystem/   # Safe file operations
+│       ├── logging/      # Logging utilities
+│       └── middleware/   # HTTP middleware (auth, CORS, logging)
+├── web/                  # React frontend
 │   └── src/
-│       ├── components/# Shared UI components
-│       ├── pages/     # Page components
-│       └── lib/       # API client library
-├── deploy/
-│   └── systemd/       # Systemd service files
-├── migrations/        # SQL migrations
-└── install.sh         # One-command installer
+│       ├── components/   # Shared UI components
+│       ├── pages/        # Page components
+│       └── lib/          # API client
+├── migrations/           # SQL schema migrations
+├── install.sh            # One-command installer
+├── start.sh              # Quick start script
+└── dev.sh                # Development launcher
 ```
 
-## Production Deployment
+---
+
+## 🔧 Management Commands
 
 ```bash
-# Full installation
-sudo bash install.sh
-
-# Or with custom options
-sudo OWP_DOMAIN=panel.example.com OWP_PANEL_PORT=2086 bash install.sh
-```
-
-### Management Commands
-
-```bash
-systemctl status openwebpanel    # Check panel status
-journalctl -u openwebpanel -f    # View live logs
+# Service management
+systemctl status openwebpanel    # Panel status
 systemctl restart openwebpanel   # Restart the panel
-tail -f /opt/openwebpanel/logs/watchdog.log  # Watchdog log
+journalctl -u openwebpanel -f    # Live logs
+
+# Logs
+tail -f /opt/openwebpanel/logs/parentd.log
+tail -f /opt/openwebpanel/logs/watchdog.log
+
+# Configuration
+cat /opt/openwebpanel/app/.env   # Panel environment variables
 ```
 
-### Manual Start (for testing)
+---
 
-```bash
-sudo bash start.sh
-```
+## ⚙️ Configuration
 
-## Configuration
-
-All configuration is via environment variables (see `.env.example`):
+All panel configuration is via environment variables (see `.env.example`):
 
 | Variable | Default | Description |
 |---|---|---|
@@ -154,17 +197,24 @@ All configuration is via environment variables (see `.env.example`):
 | `OWP_DB_PATH` | `./openwebpanel.db` | SQLite database path |
 | `OWP_STATIC_DIR` | `./web/dist` | Frontend static files |
 | `OWP_JWT_SECRET` | auto-generated | JWT signing key |
+| `OWP_ADMIN_PASSWORD` | randomly generated | Initial admin password |
 | `OWP_HOMES_BASE` | `./homes/` | User home directories |
 | `OWP_PUBLIC_HOST` | auto-detected | Server public hostname |
 | `NGINX_VHOST_DIR` | `/etc/nginx/vhosts` | Nginx vhost configs |
+| `NGINX_LOG_DIR` | `/var/log/nginx` | Nginx log directory |
+| `OWP_SMTP_PORT` | `2525` | Incoming SMTP port |
 
-## Docker
+---
+
+## 🐳 Docker
 
 ```bash
 make docker-build
 make docker-up
 ```
 
-## License
+---
 
-MIT
+## 📄 License
+
+MIT — see [LICENSE](LICENSE) for details.
