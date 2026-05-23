@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FolderOpen, Database, LayoutDashboard, Globe, LifeBuoy, BarChart3, Globe2, Shield, LogOut, ChevronLeft, Menu, Mail, Inbox, Sun, Moon } from 'lucide-react';
+import { FolderOpen, Database, LayoutDashboard, Globe, LifeBuoy, BarChart3, Globe2, Shield, LogOut, ChevronLeft, Menu, Mail, Inbox, Sun, Moon, Server } from 'lucide-react';
 import { clearTokens, getUser } from '../lib/api';
 
 const nav = [
@@ -9,6 +9,7 @@ const nav = [
   { to: '/child/files', icon: FolderOpen, label: 'File Manager' },
   { to: '/child/databases', icon: Database, label: 'Databases' },
   { to: '/child/domains', icon: Globe, label: 'Domains' },
+  { to: '/child/ftp', icon: Server, label: 'FTP Manager' },
   { to: '/child/cms', icon: Globe2, label: 'CMS Installer' },
   { to: '/child/ssl', icon: Shield, label: 'SSL Certs' },
   { to: '/child/emails', icon: Mail, label: 'Emails' },

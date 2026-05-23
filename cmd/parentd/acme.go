@@ -249,8 +249,8 @@ server {
 	ssl_certificate_key %s;
 	ssl_protocols TLSv1.2 TLSv1.3;
 
-	access_log /home/claudeuser/nginx/logs/%s.access.log;
-	error_log /home/claudeuser/nginx/logs/%s.error.log;
+	access_log ` + getNginxLogDir() + `/%s.access.log;
+	error_log ` + getNginxLogDir() + `/%s.error.log;
 
 	location / {
 	    try_files $uri $uri/ /index.php?$args;

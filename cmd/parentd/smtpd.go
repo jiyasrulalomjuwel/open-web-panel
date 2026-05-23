@@ -84,6 +84,11 @@ func (s *SMTPSession) Data(r io.Reader) error {
 		return fmt.Errorf("read message data: %w", err)
 	}
 
+	// Track SMTP bandwidth — count bytes sent/received per authenticated user
+	if s.authedUser != "" && len(raw) > 0 {
+		trackSMTPBandwidth(s.db, s.authedUser, int64(len(raw)))
+	}
+
 	msg, err := mail.ReadMessage(bytes.NewReader(raw))
 	if err != nil {
 		msg = nil

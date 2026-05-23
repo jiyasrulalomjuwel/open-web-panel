@@ -15,6 +15,7 @@ import { SSLCertificates } from './pages/SSLCertificates';
 import { Submissions } from './pages/Submissions';
 import { Emails } from './pages/Emails';
 import { Webmail } from './pages/Webmail';
+import { FTPManager } from './pages/FTPManager';
 import { ChildDashboard } from './pages/ChildDashboard';
 import { Layout } from './components/Layout';
 import { ChildLayout } from './components/ChildLayout';
@@ -94,6 +95,7 @@ export default function App() {
               <Route path="files" element={<PageTransition><FileManager /></PageTransition>} />
               <Route path="databases" element={<PageTransition><Databases /></PageTransition>} />
               <Route path="domains" element={<PageTransition><Domains /></PageTransition>} />
+              <Route path="ftp" element={<PageTransition><FTPManager /></PageTransition>} />
               <Route path="tickets" element={<PageTransition><Tickets /></PageTransition>} />
               <Route path="bandwidth" element={<PageTransition><ChildBandwidth /></PageTransition>} />
               <Route path="cms" element={<PageTransition><CMSInstaller /></PageTransition>} />

@@ -449,6 +449,12 @@ NGINX_CONF
   sed -i 's/^user .*/user www-data;/' /etc/nginx/nginx.conf 2>/dev/null || true
   mkdir -p /var/log/nginx
 
+  # Ensure nginx includes the vhosts directory
+  if ! grep -q 'include /etc/nginx/vhosts/\*\.conf;' /etc/nginx/nginx.conf; then
+    sed -i '/include \/etc\/nginx\/sites-enabled\/\*;/a\\tinclude /etc/nginx/vhosts/*.conf;' /etc/nginx/nginx.conf
+    ok "added vhosts include to nginx.conf"
+  fi
+
   nginx -t 2>&1 && ok "nginx config valid" || warn "nginx config has issues"
   ok "nginx configured"
 

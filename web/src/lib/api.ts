@@ -10,7 +10,7 @@ export interface Ticket { id: number; subject: string; status: string; created_a
 export interface Backup { id: number; domain: string; type: string; file_size: number; status: string; created_at: string; }
 export interface CronJob { id: number; command: string; schedule: string; enabled: number; }
 export interface DNSRecord { id: number; domain: string; type: string; name: string; value: string; priority: number; ttl: number; }
-export interface FTPAccount { id: number; username: string; domain: string; directory: string; }
+export interface FTPAccount { id: number; username: string; domain: string; directory: string; quota_mb: number; status: string; created_at: string; }
 export interface SSHKey { id: number; name: string; fingerprint: string; authorized: number; }
 export interface DomainStats { total_visitors: number; total_bandwidth_bytes: number; top_pages: Array<{path: string, hits: number}>; recent_hits: Array<{timestamp: string, ip: string, path: string, status: number, bytes: number}>; }
 
@@ -287,6 +287,7 @@ export const deleteCMSInstall = (id: number) => request('DELETE', `/child/cms/${
 export const getSSLCerts = () => request('GET', '/child/ssl');
 export const issueSSLCert = (data: any) => request('POST', '/child/ssl/issue', data);
 export const deleteSSLCert = (id: number) => request('DELETE', `/child/ssl/${id}`);
+export const installCustomSSLCert = (data: any) => request('POST', '/child/ssl/custom', data);
 
 // Emails
 export const getEmails = () => request('GET', '/child/emails');
@@ -300,6 +301,12 @@ export const getInbox = (id: number) => request('GET', `/child/emails/${id}/inbo
 export const readMessage = (id: number, mid: number) => request('GET', `/child/emails/${id}/messages/${mid}`);
 export const sendEmail = (id: number, data: any) => request('POST', `/child/emails/${id}/send`, data);
 export const deleteMessage = (id: number, mid: number) => request('DELETE', `/child/emails/${id}/messages/${mid}`);
+
+// FTP
+export const getFTPAccounts = () => request('GET', '/child/ftp');
+export const createFTPAccount = (data: any) => request('POST', '/child/ftp', data);
+export const updateFTPAccount = (id: number, data: any) => request('PUT', `/child/ftp/${id}`, data);
+export const deleteFTPAccount = (id: number) => request('DELETE', `/child/ftp/${id}`);
 
 // Submissions
 export const getSubmissions = (params?: any) => request('GET', '/submissions' + (params ? '?' + new URLSearchParams(params).toString() : ''));

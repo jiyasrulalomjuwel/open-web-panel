@@ -50,7 +50,7 @@ func childStatsRoutes(r chi.Router, db *sql.DB) {
 		}
 		var recentHits []logHit
 
-		logDir := "/home/claudeuser/nginx/logs"
+		logDir := getNginxLogDir()
 
 		for rows.Next() {
 			var domain string

@@ -2821,7 +2821,7 @@ func main() {
 	})
 
 	r.Route("/api/v1/child/account", func(r chi.Router) {
-		r.Use(authMw(jwtManager))
+		r.Use(authMw(jwtManager), trackBandwidth(database))
 		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 			c := getClaims(r)
 			if c == nil {
@@ -2873,17 +2873,17 @@ func main() {
 	})
 
 	r.Route("/api/v1/child/files", func(r chi.Router) {
-		r.Use(authMw(jwtManager))
+		r.Use(authMw(jwtManager), trackBandwidth(database))
 		childFileRoutes(r, database)
 	})
 
 	r.Route("/api/v1/child/databases", func(r chi.Router) {
-		r.Use(authMw(jwtManager))
+		r.Use(authMw(jwtManager), trackBandwidth(database))
 		childDbRoutes(r, database, jwtManager)
 	})
 
 	r.Route("/api/v1/child/domains", func(r chi.Router) {
-		r.Use(authMw(jwtManager))
+		r.Use(authMw(jwtManager), trackBandwidth(database))
 		childDomainRoutes(r, database)
 	})
 
@@ -2912,61 +2912,61 @@ func main() {
 		})
 
 		r.Route("/api/v1/child/cms", func(r chi.Router) {
-			r.Use(authMw(jwtManager))
+			r.Use(authMw(jwtManager), trackBandwidth(database))
 			cmsRoutes(r, database)
 		})
 
 		r.Route("/api/v1/child/ssl", func(r chi.Router) {
-			r.Use(authMw(jwtManager))
+			r.Use(authMw(jwtManager), trackBandwidth(database))
 			certRoutes(r, database)
 		})
 
 		r.Route("/api/v1/child/emails", func(r chi.Router) {
-			r.Use(authMw(jwtManager))
+			r.Use(authMw(jwtManager), trackBandwidth(database))
 			childEmailRoutes(r, database)
 		})
 
 			// Cron job routes
 			r.Route("/api/v1/child/cron", func(r chi.Router) {
-				r.Use(authMw(jwtManager))
+				r.Use(authMw(jwtManager), trackBandwidth(database))
 				childCronRoutes(r, database)
 			})
 
 			r.Route("/api/v1/child/backups", func(r chi.Router) {
-				r.Use(authMw(jwtManager))
+				r.Use(authMw(jwtManager), trackBandwidth(database))
 				childBackupRoutes(r, database)
 			})
 
 			r.Route("/api/v1/child/dns", func(r chi.Router) {
-				r.Use(authMw(jwtManager))
+				r.Use(authMw(jwtManager), trackBandwidth(database))
 				childDNSRoutes(r, database)
 			})
 
 			r.Route("/api/v1/child/ftp", func(r chi.Router) {
-				r.Use(authMw(jwtManager))
+				r.Use(authMw(jwtManager), trackBandwidth(database))
 				childFTPRoutes(r, database)
 			})
 
 			r.Route("/api/v1/child/ssh", func(r chi.Router) {
-				r.Use(authMw(jwtManager))
+				r.Use(authMw(jwtManager), trackBandwidth(database))
 				childSSHKeyRoutes(r, database)
 			})
 
 			r.Route("/api/v1/child/tokens", func(r chi.Router) {
-				r.Use(authMw(jwtManager))
+				r.Use(authMw(jwtManager), trackBandwidth(database))
 				childTokenRoutes(r, database)
 			})
 
 			r.Route("/api/v1/child/redirects", func(r chi.Router) {
-				r.Use(authMw(jwtManager))
+				r.Use(authMw(jwtManager), trackBandwidth(database))
 				redirectRoutes(r, database)
 			})
 			r.Route("/api/v1/child/hotlink", func(r chi.Router) {
-				r.Use(authMw(jwtManager))
+				r.Use(authMw(jwtManager), trackBandwidth(database))
 				hotlinkRoutes(r, database)
 			})
 			r.Route("/api/v1/child/stats", func(r chi.Router) {
-				r.Use(authMw(jwtManager))
+				r.Use(authMw(jwtManager), trackBandwidth(database))
 				childStatsRoutes(r, database)
 			})
 
@@ -2981,7 +2981,7 @@ func main() {
 		})
 
 		r.Route("/api/v1/child/tickets", func(r chi.Router) {
-			r.Use(authMw(jwtManager))
+			r.Use(authMw(jwtManager), trackBandwidth(database))
 			ticketRoutes(r, database)
 		})
 
@@ -3023,6 +3023,9 @@ func main() {
 
 	// Start SSL certificate renewal checker (daily)
 	startCertRenewal(database)
+
+	// Start Nginx vhost log bandwidth collector (every 5 min)
+	startNginxBandwidthCollector(database)
 
 	// Periodic cleanup: remove suspended accounts after configured days
 	go func() {

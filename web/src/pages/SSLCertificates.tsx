@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Globe, Plus, X, Shield, AlertTriangle, Loader2, Trash2, CheckCircle } from 'lucide-react';
-import { getSSLCerts, getDomains, issueSSLCert, deleteSSLCert } from '../lib/api';
+import { Globe, Plus, X, Shield, AlertTriangle, Loader2, Trash2, CheckCircle, FileText } from 'lucide-react';
+import { getSSLCerts, getDomains, issueSSLCert, deleteSSLCert, installCustomSSLCert } from '../lib/api';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
@@ -22,6 +22,11 @@ export function SSLCertificates() {
   const [domainId, setDomainId] = useState(0);
   const [issuing, setIssuing] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
+  const [showCustom, setShowCustom] = useState(false);
+  const [customDomainId, setCustomDomainId] = useState(0);
+  const [certificate, setCertificate] = useState('');
+  const [privateKey, setPrivateKey] = useState('');
+  const [installing, setInstalling] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -63,6 +68,22 @@ export function SSLCertificates() {
     finally { setDeleting(null); }
   };
 
+  const handleCustomInstall = async () => {
+    if (!customDomainId || !certificate.trim() || !privateKey.trim()) return;
+    setInstalling(true);
+    try {
+      const domain = domains.find(d => d.id === customDomainId);
+      await installCustomSSLCert({ domain_id: customDomainId, certificate: certificate.trim(), private_key: privateKey.trim() });
+      setShowCustom(false);
+      setCertificate('');
+      setPrivateKey('');
+      setCustomDomainId(0);
+      setSuccess('Custom SSL certificate installed for ' + (domain?.domain || ''));
+      load();
+    } catch (err: any) { setError(err?.error || 'Install failed'); }
+    finally { setInstalling(false); }
+  };
+
   const statusBadge = (s: string) => {
     const map: Record<string, 'success' | 'info' | 'error' | 'warning' | 'neutral'> = {
       issued: 'success',
@@ -84,9 +105,14 @@ export function SSLCertificates() {
           <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">SSL Certificates</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{certs.length} certificate(s)</p>
         </div>
-        <Button variant="primary" onClick={() => { setShowIssue(true); setError(''); }}>
-          <Plus className="h-4 w-4" /> Issue SSL
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => { setShowCustom(true); setError(''); setCertificate(''); setPrivateKey(''); setCustomDomainId(0); }}>
+            <FileText className="h-4 w-4" /> Custom SSL
+          </Button>
+          <Button variant="primary" onClick={() => { setShowIssue(true); setError(''); }}>
+            <Plus className="h-4 w-4" /> Issue SSL
+          </Button>
+        </div>
       </div>
 
       {error && <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600 dark:text-red-300"><AlertTriangle className="h-4 w-4" />{error}<button onClick={() => setError('')} className="ml-auto"><X className="h-4 w-4" /></button></div>}
@@ -152,6 +178,38 @@ export function SSLCertificates() {
               <p className="text-xs text-gray-400 dark:text-gray-500">A Let's Encrypt SSL certificate will be issued. The domain must be publicly accessible on port 80 for domain validation.</p>
               <Button variant="primary" className="w-full" onClick={handleIssue} disabled={issuing || !domainId} loading={issuing}>
                 Issue Certificate
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showCustom && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowCustom(false)}>
+          <div className="bg-white dark:bg-gray-800 rounded-xl w-full max-w-lg mx-4 p-6 shadow-xl" onClick={e => e.stopPropagation()}>
+            <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-5">Install Custom SSL Certificate</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Select Domain</label>
+                <select value={customDomainId} onChange={e => setCustomDomainId(Number(e.target.value))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  <option value={0}>Choose a domain...</option>
+                  {domains.map(d => <option key={d.id} value={d.id}>{d.domain}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Certificate (PEM)</label>
+                <textarea value={certificate} onChange={e => setCertificate(e.target.value)} rows={6} placeholder="-----BEGIN CERTIFICATE-----\n..."
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-mono bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Private Key (PEM)</label>
+                <textarea value={privateKey} onChange={e => setPrivateKey(e.target.value)} rows={6} placeholder="-----BEGIN RSA PRIVATE KEY-----\n..."
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-mono bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y" />
+              </div>
+              <p className="text-xs text-gray-400 dark:text-gray-500">Paste your certificate and private key in PEM format. The certificate must cover the selected domain. If you have intermediate certificates, include them after the domain certificate.</p>
+              <Button variant="primary" className="w-full" onClick={handleCustomInstall} disabled={installing || !customDomainId || !certificate.trim() || !privateKey.trim()} loading={installing}>
+                Install Certificate
               </Button>
             </div>
           </div>
