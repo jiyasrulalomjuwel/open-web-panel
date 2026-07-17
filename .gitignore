@@ -1,8 +1,8 @@
 # Binaries
 bin/
-parentd
-childd
-owp
+/parentd
+/childd
+/owp
 openwebpanel
 *.exe
 *.test
@@ -44,6 +44,7 @@ go.work.sum
 # Temp
 tmp/
 /tmp/
+build/
 
 # Backups
 backups/
