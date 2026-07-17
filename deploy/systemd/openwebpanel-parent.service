@@ -1,0 +1,19 @@
+[Unit]
+Description=OpenWebPanel Parent Daemon
+Documentation=https://github.com/openwebcpanel/openwebcpanel
+After=network.target mariadb.service
+Wants=mariadb.service nginx.service
+
+[Service]
+Type=simple
+User=openwebpanel
+WorkingDirectory=/opt/openwebpanel/app
+EnvironmentFile=/opt/openwebpanel/app/.env
+ExecStart=/opt/openwebpanel/app/bin/parentd
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+LimitNPROC=4096
+
+[Install]
+WantedBy=multi-user.target

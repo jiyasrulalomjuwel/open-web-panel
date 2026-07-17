@@ -1,0 +1,19 @@
+[Unit]
+Description=OpenWebPanel Child Daemon (%i)
+Documentation=https://github.com/openwebcpanel/openwebcpanel
+After=network.target
+
+[Service]
+Type=simple
+User=%i
+WorkingDirectory=/opt/openwebpanel/homes/%i
+Environment=OWP_HOME_DIR=/opt/openwebpanel/homes/%i
+# Each child instance gets a unique port based on the account name hash
+ExecStart=/opt/openwebpanel/app/bin/childd
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+LimitNPROC=4096
+
+[Install]
+WantedBy=multi-user.target
