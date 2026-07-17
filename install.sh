@@ -26,14 +26,19 @@ export DEBIAN_FRONTEND=noninteractive
 # BOOTSTRAP
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Determine script location
-SCRIPT_SOURCE="${BASH_SOURCE[0]}"
-while [[ -L "$SCRIPT_SOURCE" ]]; do
+# Determine script location (fallback for curl | bash mode)
+SCRIPT_SOURCE="${BASH_SOURCE[0]:-}"
+if [[ -z "$SCRIPT_SOURCE" ]]; then
+  # piped via stdin — no script path available
+  SCRIPT_DIR=""
+else
+  while [[ -L "$SCRIPT_SOURCE" ]]; do
+    SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")" && pwd)"
+    SCRIPT_SOURCE="$(readlink "$SCRIPT_SOURCE")"
+    [[ "$SCRIPT_SOURCE" != /* ]] && SCRIPT_SOURCE="$SCRIPT_DIR/$SCRIPT_SOURCE"
+  done
   SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")" && pwd)"
-  SCRIPT_SOURCE="$(readlink "$SCRIPT_SOURCE")"
-  [[ "$SCRIPT_SOURCE" != /* ]] && SCRIPT_SOURCE="$SCRIPT_DIR/$SCRIPT_SOURCE"
-done
-SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")" && pwd)"
+fi
 
 # Default paths (can be overridden by env)
 OWP_USER="${OWP_USER:-openwebpanel}"
