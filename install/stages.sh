@@ -602,8 +602,8 @@ EOF
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq build-essential 2>&1 || \
       _fatal_error "C compiler required by go-sqlite3 (CGO). Install gcc or build-essential."
   fi
-  run_cmd "Build parentd binary" "CGO_ENABLED=1 go build -o bin/parentd ./cmd/parentd/ 2>&1"
-  run_cmd "Build childd binary" "CGO_ENABLED=1 go build -o bin/childd ./cmd/childd/ 2>&1"
+  run_cmd "Build parentd binary" "CGO_ENABLED=1 go build -buildvcs=false -o bin/parentd ./cmd/parentd/ 2>&1"
+  run_cmd "Build childd binary" "CGO_ENABLED=1 go build -buildvcs=false -o bin/childd ./cmd/childd/ 2>&1"
 
   # ── Build Frontend ──
   set_status "Installing npm dependencies..." "info"
@@ -617,7 +617,8 @@ EOF
   fi
 
   set_status "Building React frontend..." "info"
-  run_cmd "Build frontend" "npm run build 2>&1 | tail -20"
+  run_cmd "Build admin frontend" "npm run build:admin 2>&1 | tail -20"
+  run_cmd "Build child frontend" "npm run build:child 2>&1 | tail -20"
 
   chown -R "$OWP_USER:$OWP_USER" "${OWP_APP_DIR}" 2>/dev/null || true
 
@@ -832,8 +833,10 @@ CRON2
       sudo -u "$OWP_USER" \
         OWP_JWT_SECRET="${OWP_JWT_SECRET}" \
         OWP_DB_PATH="${OWP_DATA_DIR}/openwebpanel.db" \
-        OWP_STATIC_DIR="${OWP_APP_DIR}/web/dist" \
-        OWP_LISTEN=":9000" \
+        OWP_ADMIN_STATIC_DIR="${OWP_APP_DIR}/web/dist/admin" \
+        OWP_CHILD_STATIC_DIR="${OWP_APP_DIR}/web/dist/child" \
+        OWP_ADMIN_LISTEN=":9000" \
+        OWP_CHILD_LISTEN=":9001" \
         OWP_HOMES_BASE="${OWP_HOMES_DIR}/" \
         OWP_PUBLIC_HOST="${OWP_DOMAIN}:9000" \
         OWP_SHARED_IP="127.0.0.1" \

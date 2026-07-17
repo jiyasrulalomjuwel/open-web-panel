@@ -2,8 +2,8 @@
 
 # Build all binaries
 build:
-	go build -o bin/parentd ./cmd/parentd
-	go build -o bin/childd ./cmd/childd
+	go build -buildvcs=false -o bin/parentd ./cmd/parentd
+	go build -buildvcs=false -o bin/childd ./cmd/childd
 
 # Run parent daemon
 run-parent:
@@ -45,8 +45,8 @@ test:
 
 # Build for production
 build-prod:
-	CGO_ENABLED=1 go build -ldflags="-s -w" -o bin/parentd ./cmd/parentd
-	CGO_ENABLED=1 go build -ldflags="-s -w" -o bin/childd ./cmd/childd
+	CGO_ENABLED=1 go build -buildvcs=false -ldflags="-s -w" -o bin/parentd ./cmd/parentd
+	CGO_ENABLED=1 go build -buildvcs=false -ldflags="-s -w" -o bin/childd ./cmd/childd
 	cd web && npm run build:all
 
 # Build frontend (both admin and child panels)
@@ -63,8 +63,8 @@ build-frontend-child:
 
 # Build backend only
 build-backend:
-	go build -o bin/parentd ./cmd/parentd
-	go build -o bin/childd ./cmd/childd
+	go build -buildvcs=false -o bin/parentd ./cmd/parentd
+	go build -buildvcs=false -o bin/childd ./cmd/childd
 
 # Docker
 docker-build:
