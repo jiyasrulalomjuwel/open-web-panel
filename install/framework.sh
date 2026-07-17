@@ -193,8 +193,14 @@ set_status() { STATUS_MESSAGE="$1"; STATUS_TYPE="${2:-info}"; }
 init_logging() {
   local log_dir
   log_dir=$(dirname "$INSTALL_LOG" 2>/dev/null || echo "/var/log")
-  mkdir -p "$log_dir" 2>/dev/null || true
-  : > "$INSTALL_LOG" 2>/dev/null || true
+  if ! mkdir -p "$log_dir" 2>/dev/null; then
+    echo "[FATAL] Cannot create log directory: $log_dir" >&2
+    exit 1
+  fi
+  if ! : > "$INSTALL_LOG" 2>/dev/null; then
+    echo "[FATAL] Cannot write to log file: $INSTALL_LOG" >&2
+    exit 1
+  fi
   log "INFO" "OpenWebPanel Installer v${OWP_VERSION} started"
   log "INFO" "Repository: ${OWP_REPO} (${OWP_BRANCH})"
   log "INFO" "System: $(uname -a)"
@@ -296,6 +302,11 @@ gen_password() {
 
 # ─── Wait for dpkg lock ────────────────────────────────────────────────────
 wait_for_dpkg() {
+  # Ensure fuser is available
+  if ! command -v fuser &>/dev/null; then
+    log_info "fuser not available — skipping dpkg lock wait"
+    return 0
+  fi
   local waited=0 MAX_WAIT=120
   while fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/cache/apt/archives/lock &>/dev/null 2>&1; do
     local pid pname

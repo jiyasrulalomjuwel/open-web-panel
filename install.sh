@@ -44,7 +44,6 @@ OWP_APP_DIR="${OWP_HOME}/app"
 IS_STANDALONE=false
 if [[ -f "${SCRIPT_DIR}/go.mod" ]] && grep -q "openwebcpanel\|open-web-panel" "${SCRIPT_DIR}/go.mod" 2>/dev/null; then
   # Running from repo directory — copy to install target
-  IS_STANDALONE=false
   LOCAL_SRC_DIR="$SCRIPT_DIR"
 else
   IS_STANDALONE=true

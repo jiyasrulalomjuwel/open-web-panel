@@ -91,6 +91,39 @@ stage_requirements() {
     log_warn "Cannot reach GitHub — some downloads may fail"
   fi
 
+  # ── Port Availability Check ──
+  set_status "Checking required ports..." "info"
+  local required_ports=("80" "${OWP_PANEL_PORT}" "${OWP_USER_PORT}" "9000" "8080" "${OWP_SMTP_PORT}" "3306")
+  local conflict_ports=()
+  for port in "${required_ports[@]}"; do
+    if ss -tlnp "sport = :${port}" 2>/dev/null | grep -q LISTEN; then
+      local proc_name
+      proc_name=$(ss -tlnp "sport = :${port}" 2>/dev/null | grep -oP 'users:\(\K[^)]+' | head -1 || echo "unknown")
+      log_info "Port $port is already in use by $proc_name"
+      conflict_ports+=("$port($proc_name)")
+    fi
+  done
+  if [[ ${#conflict_ports[@]} -gt 0 ]]; then
+    log_warn "Ports already in use: ${conflict_ports[*]}"
+  fi
+
+  # ── UFW Firewall Check & Setup ──
+  set_status "Checking firewall status..." "info"
+  if cmd_exists ufw; then
+    if ufw status 2>/dev/null | grep -qi "active"; then
+      log_info "UFW firewall is active"
+      for port in 80 443 "${OWP_PANEL_PORT}" "${OWP_USER_PORT}"; do
+        if ! ufw status 2>/dev/null | grep -qP "^\s*${port}/tcp"; then
+          log_warn "Port $port not open in UFW — will configure later"
+        fi
+      done
+    else
+      log_info "UFW is installed but not active — will configure later"
+    fi
+  else
+    log_warn "UFW not installed — will install and configure during security stage"
+  fi
+
   # Determine PHP version based on OS
   if [[ "$OS_ID" == "ubuntu" ]]; then
     case "$OS_VERSION" in
@@ -178,6 +211,13 @@ stage_prepare() {
   set_status "Creating directory structure..." "info"
   mkdir -p "$OWP_HOME" "$OWP_DATA_DIR" "$OWP_HOMES_DIR" "$OWP_LOGS_DIR" \
            "$OWP_BACKUPS_DIR" "$OWP_SSL_DIR" "$OWP_TMP_DIR"
+  # Validate critical paths
+  local critical_dirs=("$OWP_HOME" "$OWP_DATA_DIR" "$OWP_LOGS_DIR")
+  for d in "${critical_dirs[@]}"; do
+    if [[ ! -d "$d" ]]; then
+      _fatal_error "Failed to create directory: $d"
+    fi
+  done
   usermod -aG "$OWP_USER" www-data 2>/dev/null || true
   chown -R "$OWP_USER:$OWP_USER" "$OWP_HOME" 2>/dev/null || log_warn "Could not chown $OWP_HOME"
   chmod 755 "$OWP_HOME" 2>/dev/null || true
@@ -189,14 +229,15 @@ stage_prepare() {
     if [[ ! -f /swapfile ]]; then
       dd if=/dev/zero of=/swapfile bs=1M count=2048 status=none 2>/dev/null || {
         log_warn "Could not create swap file, skipping"
-        return 0
       }
-      chmod 600 /swapfile
-      mkswap /swapfile >/dev/null 2>&1
-      swapon /swapfile
-      echo '/swapfile none swap sw 0 0' >> /etc/fstab
-      register_rollback "swapoff /swapfile 2>/dev/null; rm -f /swapfile 2>/dev/null" "Remove swap file"
-      log_info "2GB swap created"
+      if [[ -f /swapfile && -s /swapfile ]]; then
+        chmod 600 /swapfile
+        mkswap /swapfile >/dev/null 2>&1
+        swapon /swapfile
+        echo '/swapfile none swap sw 0 0' >> /etc/fstab
+        register_rollback "swapoff /swapfile 2>/dev/null; rm -f /swapfile 2>/dev/null" "Remove swap file"
+        log_info "2GB swap created"
+      fi
     fi
   fi
 
@@ -277,7 +318,7 @@ stage_dependencies() {
       'php${PHP_VER}-mbstring' 'php${PHP_VER}-xml' 'php${PHP_VER}-bcmath' \
       'php${PHP_VER}-gd' 'php${PHP_VER}-zip' \
       unzip openssl sudo cron sqlite3 \
-      rsync jq ufw 2>&1"
+      psmisc rsync jq ufw 2>&1"
 
   register_rollback "DEBIAN_FRONTEND=noninteractive apt-get remove -y nginx mariadb-server php*-fpm 2>/dev/null || true" "Remove system packages"
 
@@ -418,7 +459,9 @@ NGINX_CONF
   if [[ "${OWP_SKIP_PMA:-false}" != "true" && -f /tmp/pma.zip ]]; then
     set_status "Installing phpMyAdmin ${OWP_PHPMYADMIN_VER}..." "info"
     local pma_dir="/usr/share/phpmyadmin"
-    mkdir -p "$pma_dir"
+    mkdir -p "$pma_dir" /tmp/pma
+    rm -rf /tmp/pma 2>/dev/null || true
+    mkdir -p /tmp/pma
     unzip -qo /tmp/pma.zip -d /tmp/pma/ 2>/dev/null || {
       log_warn "Failed to unzip phpMyAdmin, skipping"
       OWP_SKIP_PMA=true
@@ -550,8 +593,14 @@ EOF
   set_status "Downloading Go module dependencies..." "info"
   run_retry "Download Go modules" "go mod download 2>&1" 3 5
 
-  run_cmd "Build parentd binary" "CGO_ENABLED=1 go build -o bin/parentd ./cmd/parentd/ 2>&1"
-  run_cmd "Build childd binary" "CGO_ENABLED=1 go build -o bin/childd ./cmd/childd/ 2>&1"
+  # Check if CGO is available (gcc) — fall back to CGO_ENABLED=0 if not
+  local cgo_flag="CGO_ENABLED=1"
+  if ! command -v gcc &>/dev/null && ! command -v cc &>/dev/null; then
+    log_warn "C compiler (gcc/cc) not found — building with CGO_ENABLED=0"
+    cgo_flag="CGO_ENABLED=0"
+  fi
+  run_cmd "Build parentd binary" "${cgo_flag} go build -o bin/parentd ./cmd/parentd/ 2>&1"
+  run_cmd "Build childd binary" "${cgo_flag} go build -o bin/childd ./cmd/childd/ 2>&1"
 
   # ── Build Frontend ──
   set_status "Installing npm dependencies..." "info"
@@ -577,19 +626,32 @@ EOF
 # ═══════════════════════════════════════════════════════════════════════════════
 stage_security() {
   # ── Firewall ──
-  if [[ "$OWP_SKIP_FIREWALL" != "true" ]] && cmd_exists ufw; then
-    set_status "Configuring UFW firewall..." "info"
-    run_cmd "Reset UFW" "ufw --force reset 2>&1" "true"
-    ufw default deny incoming 2>/dev/null || true
-    ufw default allow outgoing 2>/dev/null || true
-    ufw allow ssh 2>/dev/null || true
-    ufw allow 80/tcp 2>/dev/null || true
-    ufw allow 443/tcp 2>/dev/null || true
-    ufw allow "${OWP_PANEL_PORT}/tcp" 2>/dev/null || true
-    ufw allow "${OWP_USER_PORT}/tcp" 2>/dev/null || true
-    run_cmd "Enable UFW" "ufw --force enable 2>&1" "true"
-    register_rollback "ufw --force disable 2>/dev/null || true" "Disable UFW"
-    log_info "Firewall configured"
+  if [[ "$OWP_SKIP_FIREWALL" != "true" ]]; then
+    set_status "Configuring firewall..." "info"
+    # Install UFW if not present
+    if ! cmd_exists ufw; then
+      log_info "UFW not found — installing..."
+      wait_for_dpkg
+      run_cmd "Install UFW" "DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ufw 2>&1" "true" || {
+        log_warn "Failed to install UFW — skipping firewall configuration"
+        OWP_SKIP_FIREWALL=true
+      }
+    fi
+    if [[ "$OWP_SKIP_FIREWALL" != "true" ]]; then
+      run_cmd "Reset UFW to defaults" "ufw --force reset 2>&1" "true"
+      ufw default deny incoming 2>/dev/null || true
+      ufw default allow outgoing 2>/dev/null || true
+      ufw allow ssh 2>/dev/null || true
+      ufw allow 80/tcp 2>/dev/null || true
+      ufw allow 443/tcp 2>/dev/null || true
+      ufw allow "${OWP_PANEL_PORT}/tcp" 2>/dev/null || true
+      ufw allow "${OWP_USER_PORT}/tcp" 2>/dev/null || true
+      run_cmd "Enable UFW" "ufw --force enable 2>&1" "true"
+      register_rollback "ufw --force disable 2>/dev/null || true" "Disable UFW"
+      log_info "Firewall configured"
+    fi
+  else
+    log_info "Firewall configuration skipped (OWP_SKIP_FIREWALL=true)"
   fi
 
   # ── Sudoers ──
@@ -867,7 +929,9 @@ stage_validate() {
 
   # ── Write password file ──
   set_status "Saving admin credentials..." "info"
-  mkdir -p "$(dirname "$OWP_PASSWORD_FILE")" 2>/dev/null || true
+  mkdir -p "$(dirname "$OWP_PASSWORD_FILE")" 2>/dev/null || {
+    log_warn "Cannot create directory for password file at $(dirname "$OWP_PASSWORD_FILE")"
+  }
   cat > "$OWP_PASSWORD_FILE" <<EOF
 ╔══════════════════════════════════════════╗
 ║   OpenWebPanel Admin Credentials         ║
