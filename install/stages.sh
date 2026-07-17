@@ -545,6 +545,11 @@ EOF
   # ── Build Backend ──
   set_status "Building Go backend..." "info"
   cd "${OWP_APP_DIR}" || _fatal_error "Cannot cd to ${OWP_APP_DIR}"
+
+  # Pre-download Go modules so transient network errors are caught with retry
+  set_status "Downloading Go module dependencies..." "info"
+  run_retry "Download Go modules" "go mod download 2>&1" 3 5
+
   run_cmd "Build parentd binary" "CGO_ENABLED=1 go build -o bin/parentd ./cmd/parentd/ 2>&1"
   run_cmd "Build childd binary" "CGO_ENABLED=1 go build -o bin/childd ./cmd/childd/ 2>&1"
 

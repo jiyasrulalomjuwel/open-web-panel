@@ -363,7 +363,7 @@ run_cmd() {
   echo "$output" >> "$INSTALL_LOG"
   if [[ $rc -ne 0 ]]; then
     local output_preview
-    output_preview=$(echo "$output" | head -5 | tr '\n' '; ')
+    output_preview=$(echo "$output" | tail -5 | tr '\n' '; ')
     log_error "Exit code: $rc"
     log_error "Output: $output"
     LAST_ERROR_OUTPUT="$output"
