@@ -161,18 +161,15 @@ stage_prepare() {
     parent_dir=$(dirname "$OWP_HOME" 2>/dev/null || echo "/opt")
     mkdir -p "$parent_dir" 2>/dev/null || true
 
-    local useradd_output
-    useradd_output=$(useradd -m -d "$OWP_HOME" -s "$user_shell" -U "$OWP_USER" 2>&1)
-    local rc=$?
+    local useradd_output rc
+    if getent group "$OWP_USER" &>/dev/null; then
+      useradd_output=$(useradd -m -d "$OWP_HOME" -s "$user_shell" -g "$OWP_USER" "$OWP_USER" 2>&1); rc=$?
+    else
+      useradd_output=$(useradd -m -d "$OWP_HOME" -s "$user_shell" -U "$OWP_USER" 2>&1); rc=$?
+    fi
     if [[ $rc -ne 0 ]]; then
-      # Fallback without -U (create group separately if needed)
-      log_warn "useradd with -U failed, trying without: $useradd_output"
-      useradd_output=$(useradd -m -d "$OWP_HOME" -s "$user_shell" "$OWP_USER" 2>&1)
-      rc=$?
-      if [[ $rc -ne 0 ]]; then
-        log_error "useradd failed: $useradd_output"
-        _fatal_error "Failed to create user '$OWP_USER'. Shell '${user_shell}' exists: $([ -x "$user_shell" ] && echo yes || echo no). Error: $useradd_output"
-      fi
+      log_error "useradd failed: $useradd_output"
+      _fatal_error "Failed to create user '$OWP_USER' (shell=$user_shell). $useradd_output"
     fi
     log_info "Created system user: $OWP_USER"
   fi
