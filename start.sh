@@ -30,7 +30,7 @@ OWP_ADMIN_LISTEN=":9000" \
 OWP_CHILD_LISTEN=":9001" \
 OWP_SMTP_PORT="2525" \
 OWP_HOMES_BASE="$OWP_DIR/homes/" \
-OWP_JWT_SECRET="${OWP_JWT_SECRET:-dev-secret-change-me-in-production-1234567890}" \
+OWP_JWT_SECRET="${OWP_JWT_SECRET:-$(openssl rand -base64 32 2>/dev/null || tr -dc 'A-Za-z0-9' < /dev/urandom | head -c48)}" \
 OWP_DB_PATH="$OWP_DIR/openwebpanel.db" \
 nohup "$OWP_DIR/bin/parentd" > "$OWP_DIR/parentd.log" 2>&1 &
 PARENTD_PID=$!

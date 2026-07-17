@@ -1,23 +1,16 @@
-.PHONY: build run-parent run-child dev-backend dev-frontend migrate install test
+.PHONY: build run-parent dev-backend dev-frontend migrate install test
 
 # Build all binaries
 build:
 	go build -buildvcs=false -o bin/parentd ./cmd/parentd
-	go build -buildvcs=false -o bin/childd ./cmd/childd
 
 # Run parent daemon
 run-parent:
 	go run ./cmd/parentd
 
-# Run child daemon
-run-child:
-	go run ./cmd/childd
-
-# Run both daemons in dev mode
+# Run backend in dev mode
 dev-backend:
-	go run ./cmd/parentd &
-	go run ./cmd/childd &
-	wait
+	go run ./cmd/parentd
 
 # Install frontend dependencies
 install-frontend:
@@ -46,7 +39,6 @@ test:
 # Build for production
 build-prod:
 	CGO_ENABLED=1 go build -buildvcs=false -ldflags="-s -w" -o bin/parentd ./cmd/parentd
-	CGO_ENABLED=1 go build -buildvcs=false -ldflags="-s -w" -o bin/childd ./cmd/childd
 	cd web && npm run build:all
 
 # Build frontend (both admin and child panels)
@@ -64,7 +56,6 @@ build-frontend-child:
 # Build backend only
 build-backend:
 	go build -buildvcs=false -o bin/parentd ./cmd/parentd
-	go build -buildvcs=false -o bin/childd ./cmd/childd
 
 # Docker
 docker-build:
@@ -96,14 +87,13 @@ backup:
 # Help
 help:
 	@echo "OpenWebPanel Makefile"
-	@echo "  build             - Build all Go binaries"
-	@echo "  build-prod        - Build production binaries + frontend"
+	@echo "  build             - Build Go binary"
+	@echo "  build-prod        - Build production binary + frontend"
 	@echo "  build-frontend    - Build frontend only"
 	@echo "  build-backend     - Build backend only"
 	@echo "  dev-backend       - Run backend in dev mode"
 	@echo "  dev-frontend      - Run frontend dev server"
 	@echo "  run-parent        - Run parent daemon"
-	@echo "  run-child         - Run child daemon"
 	@echo "  docker-build      - Build Docker images"
 	@echo "  docker-up         - Start Docker services"
 	@echo "  install-frontend  - Install npm dependencies"

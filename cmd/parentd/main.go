@@ -4301,7 +4301,12 @@ func main() {
 			jsonError(w, 404, "not found")
 			return
 		}
-		filePath := adminStaticDir + r.URL.Path
+		cleanPath := filepath.Clean(r.URL.Path)
+		filePath := filepath.Join(adminStaticDir, cleanPath)
+		if !strings.HasPrefix(filePath, filepath.Clean(adminStaticDir)) {
+			http.ServeFile(w, r, adminStaticDir+"/admin.html")
+			return
+		}
 		if info, err := os.Stat(filePath); err == nil && !info.IsDir() {
 			http.ServeFile(w, r, filePath)
 			return
@@ -4537,7 +4542,12 @@ func main() {
 			jsonError(w, 404, "not found")
 			return
 		}
-		filePath := childStaticDir + r.URL.Path
+		cleanPath := filepath.Clean(r.URL.Path)
+		filePath := filepath.Join(childStaticDir, cleanPath)
+		if !strings.HasPrefix(filePath, filepath.Clean(childStaticDir)) {
+			http.ServeFile(w, r, childStaticDir+"/child.html")
+			return
+		}
 		if info, err := os.Stat(filePath); err == nil && !info.IsDir() {
 			http.ServeFile(w, r, filePath)
 			return

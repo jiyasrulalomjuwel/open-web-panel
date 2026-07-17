@@ -4,7 +4,7 @@ cd /home/ubuntu/open-web-panel
 mkdir -p nginx/vhosts nginx/logs
 
 export OWP_DB_PATH=./openwebpanel.db
-export OWP_JWT_SECRET=dev-secret-key-change-in-production-1234567890
+export OWP_JWT_SECRET="${OWP_JWT_SECRET:-$(openssl rand -base64 32 2>/dev/null || tr -dc 'A-Za-z0-9' < /dev/urandom | head -c48)}"
 export OWP_ADMIN_PASSWORD=admin123
 export OWP_HOMES_BASE=./homes/
 export OWP_ADMIN_STATIC_DIR=./web/dist/admin

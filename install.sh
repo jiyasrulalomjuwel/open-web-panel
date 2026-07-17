@@ -128,17 +128,20 @@ main() {
   # Initialize the installer (logging, TUI, timer)
   init_installer
 
+  # Trap EXIT to run rollback on failure
+  trap '_exit_handler' EXIT
+
   # ─── Run All Stages ──────────────────────────────────────────────
-  run_stage "requirements" stage_requirements
-  run_stage "prepare" stage_prepare
-  run_stage "download" stage_download
-  run_stage "dependencies" stage_dependencies
-  run_stage "configure" stage_configure
-  run_stage "database" stage_database
-  run_stage "webserver" stage_webserver
-  run_stage "security" stage_security
-  run_stage "services" stage_services
-  run_stage "validate" stage_validate
+  run_stage "requirements" stage_requirements || exit $?
+  run_stage "prepare" stage_prepare || exit $?
+  run_stage "download" stage_download || exit $?
+  run_stage "dependencies" stage_dependencies || exit $?
+  run_stage "configure" stage_configure || exit $?
+  run_stage "database" stage_database || exit $?
+  run_stage "webserver" stage_webserver || exit $?
+  run_stage "security" stage_security || exit $?
+  run_stage "services" stage_services || exit $?
+  run_stage "validate" stage_validate || exit $?
 
   # ─── Final Output ────────────────────────────────────────────────
   if [[ $INSTALL_EXIT_CODE -eq 0 ]]; then
@@ -158,6 +161,14 @@ main() {
   fi
 
   exit $INSTALL_EXIT_CODE
+}
+
+# ─── EXIT Trap Handler ────────────────────────────────────────────
+_exit_handler() {
+  local rc=$?
+  if [[ $rc -ne 0 ]]; then
+    execute_rollback
+  fi
 }
 
 main "$@"
