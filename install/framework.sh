@@ -46,7 +46,8 @@ fi
 # ─── Unicode Glyphs ────────────────────────────────────────────────────────
 if $HAS_TTY && locale -a 2>/dev/null | grep -qi 'utf'; then
   G_CHECK="✓"; G_CROSS="✗"; G_BULLET="●"; G_CIRCLE="○"
-  G_ARROW="→"; G_BLOCK="█"; G_HALF="▓"; G_DARK="▒"; G_LIGHT="░"
+  G_ARROW="→"; G_DOT="·"; G_BLOCK="█"; G_HALF="▓"; G_DARK="▒"; G_LIGHT="░"
+  G_BOX_H="─"; G_BOX_V="│"
   G_ELLIPSIS="…"
 else
   G_CHECK="+"; G_CROSS="x"; G_BULLET="*"; G_CIRCLE="o"
