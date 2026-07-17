@@ -7,8 +7,10 @@ export OWP_DB_PATH=./openwebpanel.db
 export OWP_JWT_SECRET=dev-secret-key-change-in-production-1234567890
 export OWP_ADMIN_PASSWORD=admin123
 export OWP_HOMES_BASE=./homes/
-export OWP_STATIC_DIR=./web/dist
-export OWP_LISTEN=:9000
+export OWP_ADMIN_STATIC_DIR=./web/dist/admin
+export OWP_CHILD_STATIC_DIR=./web/dist/child
+export OWP_ADMIN_LISTEN=:9000
+export OWP_CHILD_LISTEN=:9001
 export NGINX_PREFIX=./nginx
 export NGINX_LOG_DIR=./nginx/logs
 

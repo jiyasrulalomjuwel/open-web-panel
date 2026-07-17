@@ -45,8 +45,8 @@ test:
 
 # Build for production
 build-prod:
-	CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/parentd ./cmd/parentd
-	CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/childd ./cmd/childd
+	CGO_ENABLED=1 go build -ldflags="-s -w" -o bin/parentd ./cmd/parentd
+	CGO_ENABLED=1 go build -ldflags="-s -w" -o bin/childd ./cmd/childd
 	cd web && npm run build:all
 
 # Build frontend (both admin and child panels)

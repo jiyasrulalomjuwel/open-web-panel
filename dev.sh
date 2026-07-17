@@ -17,7 +17,11 @@ rm -f "$(dirname "$0")/openwebpanel.db-shm" "$(dirname "$0")/openwebpanel.db-wal
 # Build and start backend
 echo "[1/2] Building and starting backend (admin :9000, child :9001)..."
 cd "$(dirname "$0")"
-go build -o bin/parentd ./cmd/parentd/
+CGO_ENABLED=1 go build -o bin/parentd ./cmd/parentd/
+OWP_DB_PATH=./openwebpanel.db \
+OWP_JWT_SECRET="${OWP_JWT_SECRET:-dev-secret-key-change-in-production-1234567890}" \
+OWP_ADMIN_PASSWORD="${OWP_ADMIN_PASSWORD:-admin123}" \
+OWP_HOMES_BASE=./homes/ \
 OWP_ADMIN_STATIC_DIR=./web/dist/admin OWP_CHILD_STATIC_DIR=./web/dist/child \
 OWP_ADMIN_LISTEN=:9000 OWP_CHILD_LISTEN=:9001 \
 OWP_PUBLIC_HOST="${SHARED_IP}:9000" OWP_SHARED_IP="${SHARED_IP}" ./bin/parentd &

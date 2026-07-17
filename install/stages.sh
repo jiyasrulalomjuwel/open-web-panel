@@ -564,8 +564,10 @@ stage_webserver() {
   cat > "${OWP_APP_DIR}/.env" <<EOF
 OWP_JWT_SECRET=${OWP_JWT_SECRET}
 OWP_DB_PATH=${OWP_DATA_DIR}/openwebpanel.db
-OWP_STATIC_DIR=${OWP_APP_DIR}/web/dist
-OWP_LISTEN=:9000
+OWP_ADMIN_STATIC_DIR=${OWP_APP_DIR}/web/dist/admin
+OWP_CHILD_STATIC_DIR=${OWP_APP_DIR}/web/dist/child
+OWP_ADMIN_LISTEN=:9000
+OWP_CHILD_LISTEN=:9001
 OWP_SHARED_IP=127.0.0.1
 OWP_PUBLIC_HOST=${OWP_DOMAIN}:9000
 OWP_HOMES_BASE=${OWP_HOMES_DIR}/
@@ -593,14 +595,15 @@ EOF
   set_status "Downloading Go module dependencies..." "info"
   run_retry "Download Go modules" "go mod download 2>&1" 3 5
 
-  # Check if CGO is available (gcc) — fall back to CGO_ENABLED=0 if not
-  local cgo_flag="CGO_ENABLED=1"
+  # CGO is REQUIRED by github.com/mattn/go-sqlite3 — install gcc if missing
   if ! command -v gcc &>/dev/null && ! command -v cc &>/dev/null; then
-    log_warn "C compiler (gcc/cc) not found — building with CGO_ENABLED=0"
-    cgo_flag="CGO_ENABLED=0"
+    log_warn "C compiler (gcc/cc) not found — installing build-essential..."
+    wait_for_dpkg
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq build-essential 2>&1 || \
+      _fatal_error "C compiler required by go-sqlite3 (CGO). Install gcc or build-essential."
   fi
-  run_cmd "Build parentd binary" "${cgo_flag} go build -o bin/parentd ./cmd/parentd/ 2>&1"
-  run_cmd "Build childd binary" "${cgo_flag} go build -o bin/childd ./cmd/childd/ 2>&1"
+  run_cmd "Build parentd binary" "CGO_ENABLED=1 go build -o bin/parentd ./cmd/parentd/ 2>&1"
+  run_cmd "Build childd binary" "CGO_ENABLED=1 go build -o bin/childd ./cmd/childd/ 2>&1"
 
   # ── Build Frontend ──
   set_status "Installing npm dependencies..." "info"
