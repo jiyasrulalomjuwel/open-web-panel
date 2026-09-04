@@ -1,0 +1,51 @@
+services:
+  openwebpanel:
+    # Self-contained image: bundles nginx + php-fpm + mariadb + the panel.
+    # parentd (admin SPA+API on :9000, child SPA+API on :9001) listens on
+    # loopback only; nginx publishes 80/443 (hosted sites) and the panel
+    # ports 2086/2082 (proxied to parentd).
+    image: openwebpanel:${OWP_IMAGE_TAG:-latest}
+    build: .
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "${OWP_PANEL_PORT:-2086}:2086"
+      - "${OWP_USER_PORT:-2082}:2082"
+      - "2525:2525"
+      - "21:21"
+      - "40000-40009:40000-40009"
+    environment:
+      OWP_JWT_SECRET: ${OWP_JWT_SECRET:?error}
+      OWP_ADMIN_USERNAME: ${OWP_ADMIN_USERNAME:-admin}
+      OWP_ADMIN_PASSWORD: ${OWP_ADMIN_PASSWORD:?error}
+      OWP_ADMIN_STATIC_DIR: /app/web/dist/admin
+      OWP_CHILD_STATIC_DIR: /app/web/dist/child
+      OWP_ADMIN_LISTEN: 127.0.0.1:9000
+      OWP_CHILD_LISTEN: 127.0.0.1:9001
+      OWP_DB_PATH: /app/data/openwebpanel.db
+      OWP_HOMES_BASE: /app/homes/
+      OWP_SHARED_IP: ${OWP_SHARED_IP:-127.0.0.1}
+      OWP_PUBLIC_HOST: ${OWP_PUBLIC_HOST:-127.0.0.1:9000}
+      OWP_SMTP_PORT: 2525
+      PHP_FPM_SOCKET: /run/php/php8.3-fpm.sock
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-}
+      MYSQL_ADMIN_PASSWORD: ${MYSQL_ADMIN_PASSWORD:-}
+      # K3s kubeconfig (Phase 0: read-only cluster detection). On hosts without
+      # k3s this path doesn't exist and the panel simply reports not-installed.
+      KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://127.0.0.1:2086/healthz >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    volumes:
+      - owp_data:/app/data
+      - owp_homes:/app/homes
+      - /etc/rancher/k3s/k3s.yaml:/etc/rancher/k3s/k3s.yaml:ro
+      - /var/lib/rancher/k3s/server/node-token:/var/lib/rancher/k3s/server/node-token:ro
+
+volumes:
+  owp_data:
+  owp_homes:

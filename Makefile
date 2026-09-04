@@ -1,0 +1,91 @@
+.PHONY: build run-parent dev-backend install-frontend dev-frontend dev-parent dev-child test build-prod build-frontend build-frontend-admin build-frontend-child build-backend docker-build docker-up docker-down clean backup help
+
+# Build all binaries
+build:
+	go build -buildvcs=false -o bin/parentd ./cmd/parentd
+
+# Run parent daemon
+run-parent:
+	go run ./cmd/parentd
+
+# Run backend in dev mode
+dev-backend:
+	go run ./cmd/parentd
+
+# Install frontend dependencies
+install-frontend:
+	cd web && npm install
+
+# Run frontend dev servers (admin on :5173, child on :5174)
+dev-frontend:
+	cd web && npm run dev:admin & npm run dev:child
+
+# Run admin panel frontend only
+dev-parent:
+	cd web && npm run dev:admin
+
+# Run child panel frontend only
+dev-child:
+	cd web && npm run dev:child
+
+# Run tests
+test:
+	go test ./... -v
+
+# Build for production
+build-prod:
+	CGO_ENABLED=1 go build -buildvcs=false -ldflags="-s -w" -o bin/parentd ./cmd/parentd
+	cd web && npm run build:all
+
+# Build frontend (both admin and child panels)
+build-frontend:
+	cd web && npm run build:all
+
+# Build admin frontend only
+build-frontend-admin:
+	cd web && npm run build:admin
+
+# Build child frontend only
+build-frontend-child:
+	cd web && npm run build:child
+
+# Build backend only
+build-backend:
+	go build -buildvcs=false -o bin/parentd ./cmd/parentd
+
+# Docker
+docker-build:
+	docker compose -f docker-compose.prod.yml build
+
+docker-up:
+	docker compose -f docker-compose.prod.yml up -d
+
+docker-down:
+	docker compose -f docker-compose.prod.yml down
+
+# Clean
+clean:
+	rm -rf bin/
+	rm -rf web/dist/
+	rm -rf web/packages/*/dist
+
+# Create backup
+backup:
+	tar --exclude='node_modules' --exclude='.git' --exclude='*.db-shm' --exclude='*.db-wal' -czf "../openwebpanel-backup-$$(date +%Y%m%d-%H%M%S).tar.gz" .
+
+# Help
+help:
+	@echo "OpenWebPanel Makefile"
+	@echo "  build             - Build Go binary"
+	@echo "  build-prod        - Build production binary + frontend"
+	@echo "  build-frontend    - Build frontend only"
+	@echo "  build-backend     - Build backend only"
+	@echo "  dev-backend       - Run backend in dev mode"
+	@echo "  dev-frontend      - Run frontend dev server"
+	@echo "  run-parent        - Run parent daemon"
+	@echo "  docker-build      - Build Docker images"
+	@echo "  docker-up         - Start Docker services"
+@echo "  install-frontend  - Install npm dependencies"
+@echo "  backup            - Create project backup"
+	@echo "  test              - Run Go tests"
+	@echo "  clean             - Remove build artifacts"

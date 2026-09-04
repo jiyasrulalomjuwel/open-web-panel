@@ -1,0 +1,60 @@
+# Binaries
+bin/
+/parentd
+/childd
+/owp
+openwebpanel
+*.exe
+*.test
+*.out
+*.o
+
+# Environment & config
+.env
+.env.local
+.env.docker
+*.db
+*.db-shm
+*.db-wal
+*.bak
+
+# Node
+node_modules/
+web/dist/
+web/.vite/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# Go workspace
+go.work
+go.work.sum
+
+# Temp
+tmp/
+/tmp/
+build/
+
+# Backups
+backups/
+
+# Offline bundle (docker save tarballs + portable tool archives) — fetched/placed locally
+bundle/*
+!bundle/.gitkeep
+!bundle/build-bundle.sh
+
+# User homes (runtime data — created by the panel when accounts are made)
+homes/
+!homes/.gitkeep

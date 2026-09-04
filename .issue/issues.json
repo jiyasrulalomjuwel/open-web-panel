@@ -1,0 +1,382 @@
+{
+  "issues": [
+    {
+      "id": "OWP-0001",
+      "title": "FTP domain ownership not validated",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "High"
+    },
+    {
+      "id": "OWP-0002",
+      "title": "SSH access flag not enforced",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "High"
+    },
+    {
+      "id": "OWP-0003",
+      "title": "Cron duplicate execution in same minute",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Medium"
+    },
+    {
+      "id": "OWP-0004",
+      "title": "getClientIP trusts client-supplied proxy header",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "High"
+    },
+    {
+      "id": "OWP-0005",
+      "title": "Hotlink protection domain unvalidated",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Medium"
+    },
+    {
+      "id": "OWP-0006",
+      "title": "DNS update lacks validation",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "High"
+    },
+    {
+      "id": "OWP-0007",
+      "title": "jsonError leaks internal 5xx details",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Medium"
+    },
+    {
+      "id": "OWP-0008",
+      "title": "Login timing oracle reveals account existence",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Medium"
+    },
+    {
+      "id": "OWP-0009",
+      "title": "SMTP auth no rate limiting",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "High"
+    },
+    {
+      "id": "OWP-0010",
+      "title": "dbadmin binds all interfaces",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "High"
+    },
+    {
+      "id": "OWP-0011",
+      "title": "ACME issuance no rate limit",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Medium"
+    },
+    {
+      "id": "OWP-0012",
+      "title": "Backups no disk space preflight",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Medium"
+    },
+    {
+      "id": "OWP-0013",
+      "title": "File write allows .owp/.trash",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "High"
+    },
+    {
+      "id": "OWP-0014",
+      "title": "DB file mode too permissive",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Medium"
+    },
+    {
+      "id": "OWP-0016",
+      "title": "Cron zero-value last_run_at mismatch",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Medium"
+    },
+    {
+      "id": "OWP-0017",
+      "title": "Backup restore allows SQL executable-comment bypass and -uroot fallback",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Critical"
+    },
+    {
+      "id": "OWP-0018",
+      "title": "php-fpm www pool clashes with parentd on 127.0.0.1:9000 in docker",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Critical"
+    },
+    {
+      "id": "OWP-0019",
+      "title": "SafePath dangling-symlink escape",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "High"
+    },
+    {
+      "id": "OWP-0020",
+      "title": "ACME queries wrong ssl_certificates table",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "High"
+    },
+    {
+      "id": "OWP-0021",
+      "title": "SSH authorize silent no-op on first key",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "High"
+    },
+    {
+      "id": "OWP-0022",
+      "title": "phpMyAdmin frontend ignores backend url and uses admin-only /pma path",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "High"
+    },
+    {
+      "id": "OWP-0023",
+      "title": "Hotlink protection page broken in both directions",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "High"
+    },
+    {
+      "id": "OWP-0024",
+      "title": "Webmail message detail wiped on refresh",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "High"
+    },
+    {
+      "id": "OWP-0025",
+      "title": "DB/domain quota TOCTOU race",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Medium"
+    },
+    {
+      "id": "OWP-0026",
+      "title": "Bandwidth recount on boot re-reads entire log",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Medium"
+    },
+    {
+      "id": "OWP-0027",
+      "title": "Stats parser walks entire access log forever",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Medium"
+    },
+    {
+      "id": "OWP-0028",
+      "title": "nginx vhost injection via account domain update",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Medium"
+    },
+    {
+      "id": "OWP-0029",
+      "title": "SSH access tri-state -1/0/1 mishandled",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Medium"
+    },
+    {
+      "id": "OWP-0030",
+      "title": "SMTP MX lookup SSRF",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Medium"
+    },
+    {
+      "id": "OWP-0031",
+      "title": "wp-config.php world-readable",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Medium"
+    },
+    {
+      "id": "OWP-0032",
+      "title": "cms isPathWithin args reversed",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Medium"
+    },
+    {
+      "id": "OWP-0033",
+      "title": "Submissions dead ownership check",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Medium"
+    },
+    {
+      "id": "OWP-0034",
+      "title": "FTP default directory absolute path rejected",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Medium"
+    },
+    {
+      "id": "OWP-0035",
+      "title": "Email disable-forward is a no-op",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Medium"
+    },
+    {
+      "id": "OWP-0036",
+      "title": "Redirect type key mismatch",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Medium"
+    },
+    {
+      "id": "OWP-0037",
+      "title": "Submissions metadata type crash",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Medium"
+    },
+    {
+      "id": "OWP-0038",
+      "title": "Accounts pagination desync",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Medium"
+    },
+    {
+      "id": "OWP-0039",
+      "title": "PHP socket path leak in error",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Medium"
+    },
+    {
+      "id": "OWP-0040",
+      "title": "CMS installs no timeout or dedupe",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Medium"
+    },
+    {
+      "id": "OWP-0041",
+      "title": "Missing DB indexes on hot query columns",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Low"
+    },
+    {
+      "id": "OWP-0042",
+      "title": "isUsernameBlocked prefix match false positives",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Low"
+    },
+    {
+      "id": "OWP-0043",
+      "title": "Raw filesystem errors leaked to child file endpoints",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Low"
+    },
+    {
+      "id": "OWP-0044",
+      "title": "owp_admin DB user missing on socket-auth installs",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Low"
+    },
+    {
+      "id": "OWP-0045",
+      "title": "Unescaped secrets in systemd EnvironmentFile",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Low"
+    },
+    {
+      "id": "OWP-0046",
+      "title": "Audit log non-UTC timestamps and wrong actor for child scope",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Low"
+    },
+    {
+      "id": "OWP-0047",
+      "title": "Rate limiter keys on spoofable client IP",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Low"
+    },
+    {
+      "id": "OWP-0048",
+      "title": "RequestID not sanitized before logging/use",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Low"
+    },
+    {
+      "id": "OWP-0049",
+      "title": "shq shell quoting emits wrong escape sequence",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Low"
+    },
+    {
+      "id": "OWP-0050",
+      "title": "Blob URLs not revoked (memory leak) / revoked too early",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Low"
+    },
+    {
+      "id": "OWP-0051",
+      "title": "Stale async responses + polling interval leak in file/SSL pages",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Low"
+    },
+    {
+      "id": "OWP-0052",
+      "title": "start-parent.sh hardcoded path and stale pidfile",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Low"
+    },
+    {
+      "id": "OWP-0053",
+      "title": "Cron DOW 7 not normalized and quota check race",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Low"
+    },
+    {
+      "id": "OWP-0054",
+      "title": "childd panic on stat error in file listing",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Low"
+    },
+    {
+      "id": "OWP-0055",
+      "title": "JWT tokens lack issuer/audience enforcement",
+      "status": "resolved",
+      "date": "2026-08-10",
+      "severity": "Low"
+    }
+  ]
+}
