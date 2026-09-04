@@ -17,6 +17,23 @@ Copy, paste on any Linux server as root, done in **~10–15 minutes**:
 curl -fsSL https://raw.githubusercontent.com/jiyasrulalomjuwel/open-web-panel/main/install.sh | sudo bash
 ```
 
+That's the recommended path — Docker is installed if missing, the image is
+built, and the admin password is printed at the end.
+
+### Option B — pure Docker, one command
+
+Same result, no installer script — clone, set two secrets, bring it up:
+
+```bash
+git clone https://github.com/jiyasrulalomjuwel/open-web-panel.git && cd open-web-panel && \
+  OWP_JWT_SECRET="$(openssl rand -hex 32)" \
+  OWP_ADMIN_PASSWORD='Choose-A-Strong-Password' \
+  sudo -E docker compose -f docker-compose.prod.yml up -d --build
+```
+
+Then open `http://your-server:2086` and log in as `admin` with the password
+you chose. Data persists in the `owp_data` and `owp_homes` volumes.
+
 The installer checks for Docker (installing it if missing), asks for your admin
 credentials, builds the self-contained image and starts everything. Your admin
 password is printed at the end (and saved in `/opt/openwebpanel/.env`).
